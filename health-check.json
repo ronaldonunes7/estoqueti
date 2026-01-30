@@ -1,0 +1,24 @@
+{
+  "api": {
+    "url": "http://localhost:3001/health",
+    "timeout": 10,
+    "expectedStatus": 200
+  },
+  "pm2": {
+    "expectedProcesses": ["inventario-ti-api"],
+    "minUptime": 60
+  },
+  "resources": {
+    "maxCpuPercent": 80,
+    "maxMemoryPercent": 85,
+    "minDiskSpaceGB": 2
+  },
+  "logs": {
+    "maxSizeMB": 500,
+    "maxErrorsPerHour": 10
+  },
+  "database": {
+    "path": "C:\\apps\\inventario-ti\\database.sqlite",
+    "maxSizeMB": 1000
+  }
+}
