@@ -12,6 +12,7 @@ import { Movements } from './pages/Movements'
 import { Reports } from './pages/Reports'
 import { AssetHistoryPage } from './pages/AssetHistory'
 import { PublicReport } from './pages/PublicReport'
+import { PublicPortal } from './pages/PublicPortal'
 import { ExternalAccess } from './pages/ExternalAccess'
 import { UnitInventory } from './pages/UnitInventory'
 
@@ -20,8 +21,9 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
-        {/* Rota pública para visualização de relatórios */}
+        {/* Rotas públicas para visualização de relatórios */}
         <Route path="/view/report/:token" element={<PublicReport />} />
+        <Route path="/public/report/:token" element={<PublicPortal />} />
         <Route
           path="/*"
           element={

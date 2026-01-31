@@ -30,7 +30,7 @@ const initDatabase = () => {
             brand_model TEXT NOT NULL,
             serial_number TEXT UNIQUE NOT NULL,
             patrimony_tag TEXT UNIQUE NOT NULL,
-            category TEXT NOT NULL CHECK(category IN ('Hardware', 'Periférico', 'Licença')),
+            category TEXT NOT NULL CHECK(category IN ('Hardware', 'Periférico', 'Licença', 'Insumos')),
             status TEXT NOT NULL DEFAULT 'Disponível' CHECK(status IN ('Disponível', 'Em Uso', 'Manutenção', 'Descartado')),
             purchase_date DATE,
             purchase_value DECIMAL(10,2),
@@ -67,7 +67,7 @@ const initDatabase = () => {
               CREATE TABLE movements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 asset_id INTEGER NOT NULL,
-                type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência')),
+                type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência', 'Recebimento')),
                 employee_name TEXT NOT NULL,
                 destination TEXT,
                 store_id INTEGER,
@@ -85,8 +85,18 @@ const initDatabase = () => {
           } else {
             // Tabela existe, verificar se tem a constraint correta
             db.get("SELECT sql FROM sqlite_master WHERE type='table' AND name='movements'", (err, tableInfo) => {
-              if (tableInfo && !tableInfo.sql.includes('Transferência')) {
-                console.log('⚠️ Atualizando tabela movements para incluir Transferência...');
+              if (err) {
+                console.error('Erro ao verificar tabela movements:', err);
+                return;
+              }
+              
+              console.log('🔍 Verificando constraint da tabela movements...');
+              const hasRecebimento = tableInfo && tableInfo.sql.includes('Recebimento');
+              const hasTransferencia = tableInfo && tableInfo.sql.includes('Transferência');
+              
+              if (!hasRecebimento || !hasTransferencia) {
+                console.log('⚠️ Atualizando tabela movements para incluir Transferência e Recebimento...');
+                console.log('Current SQL:', tableInfo?.sql);
                 
                 // Backup dos dados existentes
                 db.run(`CREATE TABLE movements_backup AS SELECT * FROM movements`, (err) => {
@@ -107,7 +117,7 @@ const initDatabase = () => {
                       CREATE TABLE movements (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         asset_id INTEGER NOT NULL,
-                        type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência')),
+                        type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência', 'Recebimento')),
                         employee_name TEXT NOT NULL,
                         destination TEXT,
                         store_id INTEGER,
@@ -200,7 +210,80 @@ const initDatabase = () => {
           if (err) {
             console.log('Erro ao verificar estrutura da tabela assets:', err.message);
           } else {
-            // Tentar adicionar o novo status via ALTER TABLE (método mais simples)
+            // Verificar se a constraint já inclui 'Em Trânsito'
+            db.get("SELECT sql FROM sqlite_master WHERE type='table' AND name='assets'", (err, row) => {
+              if (err) {
+                console.log('Erro ao verificar constraint:', err.message);
+              } else if (row && !row.sql.includes("'Em Trânsito'")) {
+                console.log('🔄 Atualizando constraint de status para incluir "Em Trânsito"...');
+                
+                // Migração: Recriar tabela com nova constraint
+                db.serialize(() => {
+                  // 1. Criar tabela temporária com nova constraint
+                  db.run(`
+                    CREATE TABLE assets_new (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      name TEXT NOT NULL,
+                      brand_model TEXT NOT NULL,
+                      serial_number TEXT UNIQUE NOT NULL,
+                      patrimony_tag TEXT UNIQUE NOT NULL,
+                      category TEXT NOT NULL CHECK(category IN ('Hardware', 'Periférico', 'Licença', 'Insumos')),
+                      status TEXT NOT NULL DEFAULT 'Disponível' CHECK(status IN ('Disponível', 'Em Uso', 'Manutenção', 'Descartado', 'Em Trânsito')),
+                      purchase_date DATE,
+                      purchase_value DECIMAL(10,2),
+                      warranty_expiry DATE,
+                      location TEXT,
+                      notes TEXT,
+                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                      barcode TEXT UNIQUE,
+                      asset_type TEXT NOT NULL DEFAULT 'unique' CHECK(asset_type IN ('unique', 'consumable')),
+                      stock_quantity INTEGER DEFAULT 0
+                    )
+                  `, (err) => {
+                    if (err) {
+                      console.log('Erro ao criar tabela temporária:', err.message);
+                      return;
+                    }
+                    
+                    // 2. Copiar dados da tabela original
+                    db.run(`
+                      INSERT INTO assets_new 
+                      SELECT id, name, brand_model, serial_number, patrimony_tag, category, status, 
+                             purchase_date, purchase_value, warranty_expiry, location, notes, 
+                             created_at, updated_at, barcode, asset_type, stock_quantity
+                      FROM assets
+                    `, (err) => {
+                      if (err) {
+                        console.log('Erro ao copiar dados:', err.message);
+                        return;
+                      }
+                      
+                      // 3. Remover tabela original
+                      db.run('DROP TABLE assets', (err) => {
+                        if (err) {
+                          console.log('Erro ao remover tabela original:', err.message);
+                          return;
+                        }
+                        
+                        // 4. Renomear tabela nova
+                        db.run('ALTER TABLE assets_new RENAME TO assets', (err) => {
+                          if (err) {
+                            console.log('Erro ao renomear tabela:', err.message);
+                          } else {
+                            console.log('✅ Constraint de status atualizada com sucesso!');
+                          }
+                        });
+                      });
+                    });
+                  });
+                });
+              } else {
+                console.log('✅ Constraint de status já está atualizada');
+              }
+            });
+            
+            // Normalizar status existentes
             db.run(`
               UPDATE assets SET status = 'Disponível' 
               WHERE status NOT IN ('Disponível', 'Em Uso', 'Manutenção', 'Descartado', 'Em Trânsito')
@@ -266,13 +349,13 @@ const initDatabase = () => {
           ['Monitor LG 24"', 'LG 24MK430H', 'LG24001', 'PAT002', '7891234567891', 'Periférico', 'Disponível', 'unique', 1, 0, '2024-02-10', 850.00, '2027-02-10'],
           ['Licença Office 365', 'Microsoft Office 365', 'MS365001', 'PAT003', '7891234567892', 'Licença', 'Em Uso', 'unique', 1, 0, '2024-01-01', 450.00, '2025-01-01'],
           ['Desktop HP EliteDesk', 'HP EliteDesk 800 G6', 'HP800001', 'PAT004', '7891234567893', 'Hardware', 'Manutenção', 'unique', 1, 0, '2023-12-05', 2800.00, '2026-12-05'],
-          ['Cabo HDMI 2m', 'Cabo HDMI', '', '', '7891234567894', 'Periférico', 'Disponível', 'consumable', 50, 10, '2024-03-01', 25.00, null],
-          ['Mouse USB', 'Mouse Óptico USB', '', '', '7891234567895', 'Periférico', 'Disponível', 'consumable', 25, 5, '2024-03-01', 35.00, null],
-          ['Teclado USB', 'Teclado ABNT2 USB', '', '', '7891234567896', 'Periférico', 'Disponível', 'consumable', 15, 3, '2024-03-01', 120.00, null]
+          ['Cabo HDMI 2m', 'Cabo HDMI', '', '', '7891234567894', 'Insumos', 'Disponível', 'consumable', 50, 10, '2024-03-01', 25.00, null],
+          ['Mouse USB', 'Mouse Óptico USB', '', '', '7891234567895', 'Insumos', 'Disponível', 'consumable', 25, 5, '2024-03-01', 35.00, null],
+          ['Teclado USB', 'Teclado ABNT2 USB', '', '', '7891234567896', 'Insumos', 'Disponível', 'consumable', 15, 3, '2024-03-01', 120.00, null]
         ];
 
         const insertAsset = db.prepare(`
-          INSERT OR IGNORE INTO assets (name, brand_model, serial_number, patrimony_tag, barcode, category, status, asset_type, stock_quantity, min_stock, purchase_date, purchase_value, warranty_expiry) 
+          INSERT OR REPLACE INTO assets (name, brand_model, serial_number, patrimony_tag, barcode, category, status, asset_type, stock_quantity, min_stock, purchase_date, purchase_value, warranty_expiry) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
@@ -288,17 +371,17 @@ const initDatabase = () => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             token TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
-            scope TEXT NOT NULL CHECK(scope IN ('general', 'store')),
-            store_id INTEGER,
+            scope TEXT NOT NULL CHECK(scope IN ('general', 'store', 'multi_store')),
+            store_ids TEXT, -- JSON array para múltiplas lojas
             period TEXT NOT NULL CHECK(period IN ('7days', '30days', 'current_month')),
             password_hash TEXT,
             expires_at DATETIME NOT NULL,
+            show_financial BOOLEAN DEFAULT 1, -- Controle de exibição de valores
             click_count INTEGER DEFAULT 0,
             is_active BOOLEAN DEFAULT 1,
             created_by INTEGER NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_accessed DATETIME,
-            FOREIGN KEY (store_id) REFERENCES stores (id),
             FOREIGN KEY (created_by) REFERENCES users (id)
           )
         `);

@@ -232,6 +232,7 @@ export const Assets: React.FC = () => {
             <option value="Hardware">Hardware</option>
             <option value="Periférico">Periférico</option>
             <option value="Licença">Licença</option>
+            <option value="Insumos">Insumos</option>
           </select>
 
           <select
@@ -599,6 +600,7 @@ export const Assets: React.FC = () => {
                           <option value="Hardware">Hardware</option>
                           <option value="Periférico">Periférico</option>
                           <option value="Licença">Licença</option>
+                          <option value="Insumos">Insumos</option>
                         </select>
                         {errors.category && <p className="text-red-600 text-sm mt-1">{errors.category.message}</p>}
                       </div>

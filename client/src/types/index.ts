@@ -26,7 +26,7 @@ export interface Asset {
   serial_number?: string
   patrimony_tag?: string
   barcode?: string
-  category: 'Hardware' | 'Periférico' | 'Licença'
+  category: 'Hardware' | 'Periférico' | 'Licença' | 'Insumos'
   status: 'Disponível' | 'Em Uso' | 'Manutenção' | 'Descartado' | 'Em Trânsito'
   asset_type: 'unique' | 'consumable'
   stock_quantity: number

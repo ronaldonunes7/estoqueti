@@ -3,8 +3,27 @@ const { db } = require('../database/init');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// Rate limiting para rotas públicas
+const publicRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // máximo 100 tentativas por IP
+  message: { message: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting rigoroso para validação de tokens
+const tokenValidationLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutos
+  max: 20, // máximo 20 tentativas por IP
+  message: { message: 'Muitas tentativas de validação. Tente novamente em 5 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Criar novo link externo
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
@@ -12,9 +31,11 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     name,
     scope,
     store_id,
+    store_ids, // Array de IDs de lojas para multi-store
     period,
     password,
-    expires_at
+    expires_at,
+    show_financial = true
   } = req.body;
 
   if (!name || !scope || !period || !expires_at) {
@@ -29,18 +50,28 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     });
   }
 
+  // Validar escopo multi-loja
+  if (scope === 'multi_store' && (!store_ids || !Array.isArray(store_ids) || store_ids.length === 0)) {
+    return res.status(400).json({ message: 'Para escopo multi-loja, é necessário informar pelo menos uma loja' });
+  }
+
   try {
-    const token = uuidv4();
+    // Gerar token UUID v4 de 32 caracteres (sem hífens)
+    const token = uuidv4().replace(/-/g, '');
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
 
     const query = `
       INSERT INTO external_report_links (
-        token, name, scope, store_id, period, password_hash, expires_at, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        token, name, scope, store_ids, period, password_hash, expires_at, show_financial, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
+    // Para compatibilidade, usar store_id se for escopo 'store', senão usar store_ids
+    const storeIdsJson = scope === 'multi_store' ? JSON.stringify(store_ids) : 
+                        scope === 'store' ? JSON.stringify([store_id]) : null;
+
     db.run(query, [
-      token, name, scope, store_id || null, period, passwordHash, expires_at, req.user.id
+      token, name, scope, storeIdsJson, period, passwordHash, expires_at, show_financial ? 1 : 0, req.user.id
     ], function(err) {
       if (err) {
         console.error('Erro ao criar link externo:', err);
@@ -55,7 +86,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
         message: 'Link externo criado com sucesso',
         link_id: this.lastID,
         token,
-        url: `${frontendUrl}/view/report/${token}`
+        url: `${frontendUrl}/public/report/${token}`
       });
     });
   } catch (error) {
@@ -304,6 +335,199 @@ router.get('/data/:token', async (req, res) => {
           store_city: m.store_city,
           quantity: m.quantity
         }))
+      });
+    });
+  });
+});
+
+// ===== NOVAS ROTAS PARA PORTAL PÚBLICO =====
+
+// Validar token para portal público (com rate limiting)
+router.get('/public/validate/:token', tokenValidationLimit, async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.query;
+
+  if (!token || token.length !== 32) {
+    return res.status(400).json({ message: 'Token inválido' });
+  }
+
+  const linkQuery = `
+    SELECT 
+      erl.*,
+      u.username as created_by_username
+    FROM external_report_links erl
+    JOIN users u ON erl.created_by = u.id
+    WHERE erl.token = ? AND erl.is_active = 1
+  `;
+
+  db.get(linkQuery, [token], async (err, link) => {
+    if (err || !link) {
+      return res.status(404).json({ message: 'Link não encontrado ou inválido' });
+    }
+
+    if (new Date(link.expires_at) < new Date()) {
+      return res.status(410).json({ message: 'Link expirado' });
+    }
+
+    if (link.password_hash) {
+      if (!password) {
+        return res.status(401).json({ message: 'Senha necessária', requiresPassword: true });
+      }
+      
+      const isValidPassword = await bcrypt.compare(password, link.password_hash);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Senha incorreta' });
+      }
+    }
+
+    // Incrementar contador de cliques
+    db.run(
+      'UPDATE external_report_links SET click_count = click_count + 1, last_accessed = CURRENT_TIMESTAMP WHERE id = ?',
+      [link.id]
+    );
+
+    // Obter lojas permitidas
+    let allowedStores = [];
+    if (link.scope === 'general') {
+      // Buscar todas as lojas
+      db.all('SELECT id, name, city FROM stores ORDER BY name', (err, stores) => {
+        if (!err) {
+          allowedStores = stores;
+        }
+        sendResponse();
+      });
+    } else if (link.scope === 'multi_store' && link.store_ids) {
+      // Buscar lojas específicas
+      const storeIds = JSON.parse(link.store_ids);
+      const placeholders = storeIds.map(() => '?').join(',');
+      db.all(`SELECT id, name, city FROM stores WHERE id IN (${placeholders}) ORDER BY name`, storeIds, (err, stores) => {
+        if (!err) {
+          allowedStores = stores;
+        }
+        sendResponse();
+      });
+    } else {
+      sendResponse();
+    }
+
+    function sendResponse() {
+      res.json({
+        valid: true,
+        config: {
+          name: link.name,
+          scope: link.scope,
+          period: link.period,
+          show_financial: Boolean(link.show_financial),
+          allowed_stores: allowedStores,
+          created_by: link.created_by_username
+        }
+      });
+    }
+  });
+});
+
+// Obter dados do dashboard para uma loja específica (portal público)
+router.get('/public/dashboard/:token/:storeId', publicRateLimit, async (req, res) => {
+  const { token, storeId } = req.params;
+  const { password } = req.query;
+
+  if (!token || token.length !== 32) {
+    return res.status(400).json({ message: 'Token inválido' });
+  }
+
+  // Validar token e permissões
+  const linkQuery = `
+    SELECT * FROM external_report_links 
+    WHERE token = ? AND is_active = 1
+  `;
+
+  db.get(linkQuery, [token], async (err, link) => {
+    if (err || !link) {
+      return res.status(404).json({ message: 'Link não encontrado' });
+    }
+
+    if (new Date(link.expires_at) < new Date()) {
+      return res.status(410).json({ message: 'Link expirado' });
+    }
+
+    if (link.password_hash && password) {
+      const isValidPassword = await bcrypt.compare(password, link.password_hash);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Senha incorreta' });
+      }
+    }
+
+    // Verificar se a loja está permitida
+    let isStoreAllowed = false;
+    if (link.scope === 'general') {
+      isStoreAllowed = true;
+    } else if (link.scope === 'multi_store' && link.store_ids) {
+      const allowedStoreIds = JSON.parse(link.store_ids);
+      isStoreAllowed = allowedStoreIds.includes(parseInt(storeId));
+    }
+
+    if (!isStoreAllowed) {
+      return res.status(403).json({ message: 'Acesso negado para esta loja' });
+    }
+
+    // Buscar dados da loja
+    db.get('SELECT * FROM stores WHERE id = ?', [storeId], (err, store) => {
+      if (err || !store) {
+        return res.status(404).json({ message: 'Loja não encontrada' });
+      }
+
+      // Buscar métricas da loja
+      const metricsQuery = `
+        SELECT 
+          COUNT(*) as total_assets,
+          COUNT(CASE WHEN status = 'Disponível' THEN 1 END) as available_assets,
+          COUNT(CASE WHEN status = 'Em Uso' THEN 1 END) as in_use_assets,
+          COUNT(CASE WHEN status = 'Manutenção' THEN 1 END) as maintenance_assets,
+          ${link.show_financial ? 'COALESCE(SUM(purchase_value), 0) as total_value' : '0 as total_value'}
+        FROM assets a
+        LEFT JOIN movements m ON a.id = m.asset_id 
+        WHERE m.store_id = ? OR (m.store_id IS NULL AND ? = 1)
+      `;
+
+      db.get(metricsQuery, [storeId, link.scope === 'general' ? 1 : 0], (err, metrics) => {
+        if (err) {
+          return res.status(500).json({ message: 'Erro ao buscar métricas' });
+        }
+
+        // Buscar lista de ativos
+        const assetsQuery = `
+          SELECT 
+            a.id,
+            a.name,
+            a.brand_model,
+            a.status,
+            a.created_at,
+            ${link.show_financial ? 'a.purchase_value' : 'NULL as purchase_value'}
+          FROM assets a
+          LEFT JOIN movements m ON a.id = m.asset_id
+          WHERE m.store_id = ? OR (m.store_id IS NULL AND ? = 1)
+          ORDER BY a.created_at DESC
+          LIMIT 100
+        `;
+
+        db.all(assetsQuery, [storeId, link.scope === 'general' ? 1 : 0], (err, assets) => {
+          if (err) {
+            return res.status(500).json({ message: 'Erro ao buscar ativos' });
+          }
+
+          res.json({
+            store,
+            metrics: {
+              total_assets: metrics.total_assets || 0,
+              available_assets: metrics.available_assets || 0,
+              in_use_assets: metrics.in_use_assets || 0,
+              maintenance_assets: metrics.maintenance_assets || 0,
+              total_value: link.show_financial ? (metrics.total_value || 0) : null
+            },
+            assets: assets || [],
+            show_financial: Boolean(link.show_financial)
+          });
+        });
       });
     });
   });

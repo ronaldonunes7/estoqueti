@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { X, Package, Scan, Plus } from 'lucide-react'
+import { X, Package, Scan, Plus, AlertTriangle } from 'lucide-react'
 import { Asset } from '../types'
 import api from '../services/api'
 import toast from 'react-hot-toast'
@@ -55,15 +55,23 @@ export const AddStockModal: React.FC<AddStockModalProps> = ({
     }
   }, [isOpen, selectedAsset])
 
-  // Search products (only consumables)
+  // Search products (all types, but will validate consumable later)
   useEffect(() => {
     if (searchTerm.length >= 2) {
       const searchProducts = async () => {
         try {
-          const response = await api.get(`/assets?search=${encodeURIComponent(searchTerm)}&asset_type=consumable`)
-          setSearchResults(response.data.assets || [])
+          console.log('🔍 Buscando por:', searchTerm)
+          const response = await api.get(`/assets?search=${encodeURIComponent(searchTerm)}`)
+          console.log('📊 Resposta da API:', response.data)
+          
+          // Filter only consumables on frontend
+          const consumableAssets = (response.data.assets || []).filter(
+            (asset: Asset) => asset.asset_type === 'consumable'
+          )
+          console.log('🎯 Insumos encontrados:', consumableAssets)
+          setSearchResults(consumableAssets)
         } catch (error) {
-          console.error('Erro ao buscar produtos:', error)
+          console.error('❌ Erro ao buscar produtos:', error)
         }
       }
       
@@ -200,6 +208,20 @@ export const AddStockModal: React.FC<AddStockModalProps> = ({
                       </div>
                     </button>
                   ))}
+                </div>
+              )}
+              
+              {/* No results message */}
+              {searchTerm.length >= 2 && searchResults.length === 0 && (
+                <div className="border border-amber-200 rounded-lg p-3 bg-amber-50">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Nenhum insumo encontrado</span>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Apenas insumos (consumíveis) podem ter estoque adicionado. 
+                    Verifique se o produto está cadastrado como "consumable".
+                  </p>
                 </div>
               )}
             </div>

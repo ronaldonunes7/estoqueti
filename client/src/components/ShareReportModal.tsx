@@ -10,7 +10,8 @@ import {
   Calendar,
   Building,
   Globe,
-  CheckCircle
+  CheckCircle,
+  DollarSign
 } from 'lucide-react'
 import api from '../services/api'
 import { Store } from '../types'
@@ -18,11 +19,13 @@ import toast from 'react-hot-toast'
 
 interface ShareReportFormData {
   name: string
-  scope: 'general' | 'store'
+  scope: 'general' | 'store' | 'multi_store'
   store_id?: number
+  store_ids?: number[]
   period: '7days' | '30days' | 'current_month'
   password?: string
   expires_at: string
+  show_financial: boolean
 }
 
 interface ShareReportModalProps {
@@ -34,15 +37,17 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
   const [showPassword, setShowPassword] = useState(false)
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<ShareReportFormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ShareReportFormData>({
     defaultValues: {
       scope: 'general',
       period: '30days',
+      show_financial: true,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 dias
     }
   })
 
   const scope = watch('scope')
+  const selectedStoreIds = watch('store_ids') || []
 
   const { data: storesData } = useQuery(
     'stores-for-share',
@@ -70,6 +75,12 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
   )
 
   const onSubmit = (data: ShareReportFormData) => {
+    // Validação adicional para multi-store
+    if (data.scope === 'multi_store' && (!data.store_ids || data.store_ids.length === 0)) {
+      toast.error('Selecione pelo menos uma unidade para o escopo multi-loja')
+      return
+    }
+    
     createLinkMutation.mutate(data)
   }
 
@@ -206,7 +217,7 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Escopo do Relatório
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                 <input
                   type="radio"
@@ -233,8 +244,24 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
                 <div className="flex items-center gap-2">
                   <Building className="h-5 w-5 text-green-500" />
                   <div>
-                    <div className="font-medium">Por Unidade</div>
-                    <div className="text-sm text-gray-500">Loja específica</div>
+                    <div className="font-medium">Unidade Específica</div>
+                    <div className="text-sm text-gray-500">Uma loja apenas</div>
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  {...register('scope')}
+                  value="multi_store"
+                  className="mr-3"
+                />
+                <div className="flex items-center gap-2">
+                  <Building className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <div className="font-medium">Múltiplas Unidades</div>
+                    <div className="text-sm text-gray-500">Selecionar lojas específicas</div>
                   </div>
                 </div>
               </label>
@@ -265,6 +292,81 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
               )}
             </div>
           )}
+
+          {/* Seleção de Múltiplas Lojas (se escopo for 'multi_store') */}
+          {scope === 'multi_store' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Selecionar Unidades ({selectedStoreIds.length} selecionadas)
+              </label>
+              <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
+                {storesData?.map((store: Store) => (
+                  <label key={store.id} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedStoreIds.includes(store.id)}
+                      onChange={(e) => {
+                        const currentIds = selectedStoreIds || []
+                        if (e.target.checked) {
+                          setValue('store_ids', [...currentIds, store.id])
+                        } else {
+                          setValue('store_ids', currentIds.filter(id => id !== store.id))
+                        }
+                      }}
+                      className="mr-3"
+                    />
+                    <div>
+                      <div className="font-medium text-gray-900">{store.name}</div>
+                      <div className="text-sm text-gray-500">{store.city}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {scope === 'multi_store' && selectedStoreIds.length === 0 && (
+                <p className="text-red-500 text-sm mt-1">Selecione pelo menos uma unidade</p>
+              )}
+            </div>
+          )}
+
+          {/* Controle de Informações Financeiras */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nível de Detalhe
+            </label>
+            <div className="space-y-3">
+              <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  {...register('show_financial')}
+                  value="true"
+                  className="mr-3"
+                />
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-500" />
+                  <div>
+                    <div className="font-medium">Completo</div>
+                    <div className="text-sm text-gray-500">Inclui valores patrimoniais e financeiros</div>
+                  </div>
+                </div>
+              </label>
+              
+              <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  {...register('show_financial')}
+                  value="false"
+                  className="mr-3"
+                />
+                <div className="flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <div className="font-medium">Operacional</div>
+                    <div className="text-sm text-gray-500">Apenas dados operacionais (sem valores)</div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* Período de Dados */}
           <div>

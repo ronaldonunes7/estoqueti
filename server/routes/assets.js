@@ -429,6 +429,25 @@ router.get('/low-stock', authenticateToken, (req, res) => {
   });
 });
 
+// Debug endpoint - listar todos os consumíveis
+router.get('/debug/consumables', authenticateToken, (req, res) => {
+  const query = `
+    SELECT id, name, barcode, asset_type, stock_quantity 
+    FROM assets 
+    WHERE asset_type = 'consumable'
+    ORDER BY name
+  `;
+
+  db.all(query, [], (err, assets) => {
+    if (err) {
+      return res.status(500).json({ message: 'Erro ao buscar consumíveis' });
+    }
+
+    console.log('🔍 Consumíveis no banco:', assets);
+    res.json({ assets, count: assets.length });
+  });
+});
+
 // Adicionar estoque (entrada de insumos)
 router.post('/add-stock', authenticateToken, requireAdmin, (req, res) => {
   const { asset_id, quantity, unit_value, document, supplier } = req.body;

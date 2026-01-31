@@ -210,6 +210,7 @@ export const Reports: React.FC = () => {
                     <option value="Hardware">Hardware</option>
                     <option value="Periférico">Periférico</option>
                     <option value="Licença">Licença</option>
+                    <option value="Insumos">Insumos</option>
                   </select>
                 </div>
               </>

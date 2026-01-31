@@ -398,9 +398,9 @@ router.post('/transfer', authenticateToken, (req, res) => {
         
         if (asset.asset_type === 'consumable') {
           updateQuery = 'UPDATE assets SET stock_quantity = stock_quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
-          updateParams = [finalQuantity, asset_id];
+          updateParams = [quantity, asset_id];
         } else {
-          // NOVO: Ativos únicos vão para 'Em Trânsito' em vez de 'Em Uso'
+          // Ativos únicos vão para 'Em Trânsito' durante transferência
           updateQuery = 'UPDATE assets SET status = "Em Trânsito", updated_at = CURRENT_TIMESTAMP WHERE id = ?';
           updateParams = [asset_id];
         }

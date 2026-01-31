@@ -49,7 +49,8 @@ export const AssetPredictiveAnalysis: React.FC<AssetPredictiveAnalysisProps> = (
       const categoryMaintenanceInterval = {
         'Hardware': 365, // 1 ano
         'Periférico': 730, // 2 anos
-        'Licença': 0 // Não se aplica
+        'Licença': 0, // Não se aplica
+        'Insumos': 0 // Não se aplica (consumíveis)
       }
       const interval = categoryMaintenanceInterval[asset.category as keyof typeof categoryMaintenanceInterval] || 365
       return addDays(new Date(asset.created_at), interval)
@@ -64,7 +65,8 @@ export const AssetPredictiveAnalysis: React.FC<AssetPredictiveAnalysisProps> = (
     const categoryLifespan = {
       'Hardware': 1825, // 5 anos
       'Periférico': 1095, // 3 anos
-      'Licença': 365 // 1 ano (renovação)
+      'Licença': 365, // 1 ano (renovação)
+      'Insumos': 365 // 1 ano (reposição)
     }
     const lifespan = categoryLifespan[asset.category as keyof typeof categoryLifespan] || 1825
     return addDays(new Date(asset.created_at), lifespan)
@@ -77,7 +79,8 @@ export const AssetPredictiveAnalysis: React.FC<AssetPredictiveAnalysisProps> = (
     const categoryDepreciationRate = {
       'Hardware': 0.2, // 20% ao ano
       'Periférico': 0.33, // 33% ao ano
-      'Licença': 1 // 100% ao ano
+      'Licença': 1, // 100% ao ano
+      'Insumos': 1 // 100% ao ano (consumível)
     }
     
     const rate = categoryDepreciationRate[asset.category as keyof typeof categoryDepreciationRate] || 0.2
