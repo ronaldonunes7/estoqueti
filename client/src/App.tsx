@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { AdminRoute } from './components/AdminRoute'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
@@ -37,13 +38,21 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/assets" element={<Assets />} />
                   <Route path="/stores" element={<Stores />} />
-                  <Route path="/transfer" element={<Transfer />} />
+                  <Route path="/transfer" element={
+                    <AdminRoute>
+                      <Transfer />
+                    </AdminRoute>
+                  } />
                   <Route path="/confirmar-recebimento" element={<ReceiptConfirmation />} />
                   <Route path="/test-qr" element={<TestQR />} />
                   <Route path="/database-cleanup" element={<DatabaseCleanup />} />
                   <Route path="/movements" element={<Movements />} />
                   <Route path="/reports" element={<Reports />} />
-                  <Route path="/external-access" element={<ExternalAccess />} />
+                  <Route path="/external-access" element={
+                    <AdminRoute>
+                      <ExternalAccess />
+                    </AdminRoute>
+                  } />
                   <Route path="/inventory/asset/:id/history" element={<AssetHistoryPage />} />
                   <Route path="/inventory/unit/:id" element={<UnitInventory />} />
                   <Route path="/dev-tools" element={<DevTools />} />

@@ -13,18 +13,23 @@ import {
   TrendingUp,
   Wrench,
   AlertCircle,
-  Info
+  Info,
+  Shield,
+  Users
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import api from '../services/api'
 import { DashboardData } from '../types'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { usePermissions } from '../hooks/usePermissions'
+import { AdminOnly, RoleGuard } from '../components/RoleGuard'
 import { LowStockAlert } from '../components/LowStockAlert'
 import { formatCurrency, formatCurrencyCompact } from '../utils/currency'
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
+  const permissions = usePermissions()
   const { data: dashboardData, isLoading } = useQuery<DashboardData>(
     'dashboard',
     async () => {
@@ -144,70 +149,166 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Business Intelligence - Visão estratégica do inventário</p>
-      </div>
-
-      {/* Alertas de BI no topo */}
-      <div className="flex gap-4">
-        {/* Alerta de itens em trânsito há mais de 48h */}
-        {(metrics?.itemsInTransitOver48h || 0) > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600" />
-            <div>
-              <span className="text-sm font-medium text-amber-800">
-                {metrics?.itemsInTransitOver48h} {(metrics?.itemsInTransitOver48h || 0) === 1 ? 'item' : 'itens'} em trânsito há mais de 48h
+      {/* Header diferenciado por role */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+            Dashboard
+            {permissions.isAdmin && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                <Shield className="w-3 h-3" />
+                Administrador
               </span>
-              <button className="ml-2 text-amber-700 hover:text-amber-900 text-sm underline">
-                Ver detalhes
-              </button>
-            </div>
-          </div>
-        )}
+            )}
+            {permissions.isViewer && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                <Eye className="w-3 h-3" />
+                Visualização
+              </span>
+            )}
+          </h1>
+          <p className="text-gray-600">
+            {permissions.isAdmin 
+              ? "Business Intelligence - Visão estratégica do inventário" 
+              : "Visualização do inventário - Somente leitura"
+            }
+          </p>
+        </div>
 
-        {/* Alerta de estoque baixo */}
-        {(metrics?.lowStockItems || 0) > 0 && (
-          <Link 
-            to="/assets?low_stock_only=true"
-            className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 hover:bg-red-100 transition-colors"
-          >
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <span className="text-sm font-medium text-red-800">
-              {metrics?.lowStockItems} {(metrics?.lowStockItems || 0) === 1 ? 'item abaixo' : 'itens abaixo'} do estoque mínimo
-            </span>
-          </Link>
-        )}
+        {/* Indicador de permissões */}
+        <div className="text-right">
+          <div className="text-sm text-gray-500">
+            Logado como: <span className="font-medium">{permissions.user?.username}</span>
+          </div>
+          <div className="text-xs text-gray-400">
+            {permissions.isAdmin ? "Controle total do sistema" : "Acesso de visualização"}
+          </div>
+        </div>
       </div>
 
-      {/* Cards de métricas principais com foco financeiro */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {metricCards.map((card) => {
-          const Icon = card.icon
-          return (
-            <div key={card.title} className={`card ${card.bgColor} border-0`}>
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                    <div className="group relative">
-                      <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {card.tooltip}
-                      </div>
-                    </div>
-                  </div>
-                  <p className={`text-2xl font-bold ${card.textColor}`}>{card.value}</p>
-                  <p className="text-sm text-gray-500 mt-1">{card.subtitle}</p>
-                </div>
-                <div className={`p-3 rounded-lg ${card.iconColor}`}>
-                  <Icon className="h-6 w-6 text-white" />
-                </div>
+      {/* Dashboard para Administradores - Controle Completo */}
+      <AdminOnly>
+        {/* Alertas de BI no topo */}
+        <div className="flex gap-4">
+          {/* Alerta de itens em trânsito há mais de 48h */}
+          {(metrics?.itemsInTransitOver48h || 0) > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              <div>
+                <span className="text-sm font-medium text-amber-800">
+                  {metrics?.itemsInTransitOver48h} {(metrics?.itemsInTransitOver48h || 0) === 1 ? 'item' : 'itens'} em trânsito há mais de 48h
+                </span>
+                <button className="ml-2 text-amber-700 hover:text-amber-900 text-sm underline">
+                  Ver detalhes
+                </button>
               </div>
             </div>
-          )
-        })}
-      </div>
+          )}
+
+          {/* Alerta de estoque baixo */}
+          {(metrics?.lowStockItems || 0) > 0 && (
+            <Link 
+              to="/assets?low_stock_only=true"
+              className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 hover:bg-red-100 transition-colors"
+            >
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+              <span className="text-sm font-medium text-red-800">
+                {metrics?.lowStockItems} {(metrics?.lowStockItems || 0) === 1 ? 'item abaixo' : 'itens abaixo'} do estoque mínimo
+              </span>
+            </Link>
+          )}
+        </div>
+      </AdminOnly>
+
+      {/* Dashboard para Lojas - Visualização Simplificada */}
+      <RoleGuard requiredRole="viewer">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <Info className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="text-sm font-medium text-blue-800">Modo Visualização - Loja</h3>
+              <p className="text-sm text-blue-700">
+                Você pode visualizar o inventário e confirmar recebimentos via QR Code. 
+                Para transferências e alterações, entre em contato com a equipe de TI.
+              </p>
+            </div>
+          </div>
+        </div>
+      </RoleGuard>
+
+      {/* Cards de métricas - Diferenciados por Role */}
+      <AdminOnly fallback={
+        /* Dashboard Simplificado para Lojas */
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="card bg-blue-50 border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">O que tenho aqui</p>
+                <p className="text-2xl font-bold text-blue-600">{metrics?.availableAssets || 0}</p>
+                <p className="text-sm text-gray-500 mt-1">Itens disponíveis</p>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-500">
+                <Package className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-amber-50 border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Aguardando chegada</p>
+                <p className="text-2xl font-bold text-amber-600">{pendingTransfers?.length || 0}</p>
+                <p className="text-sm text-gray-500 mt-1">Transferências pendentes</p>
+              </div>
+              <div className="p-3 rounded-lg bg-amber-500">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-green-50 border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Posso confirmar</p>
+                <p className="text-2xl font-bold text-green-600">QR Code</p>
+                <p className="text-sm text-gray-500 mt-1">Recebimentos via scanner</p>
+              </div>
+              <div className="p-3 rounded-lg bg-green-500">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+      }>
+        {/* Dashboard Completo para Administradores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {metricCards.map((card) => {
+            const Icon = card.icon
+            return (
+              <div key={card.title} className={`card ${card.bgColor} border-0`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                      <div className="group relative">
+                        <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          {card.tooltip}
+                        </div>
+                      </div>
+                    </div>
+                    <p className={`text-2xl font-bold ${card.textColor}`}>{card.value}</p>
+                    <p className="text-sm text-gray-500 mt-1">{card.subtitle}</p>
+                  </div>
+                  <div className={`p-3 rounded-lg ${card.iconColor}`}>
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </AdminOnly>
 
       {/* Seção de Unidades/Lojas com valor patrimonial */}
       {storesData && storesData.length > 0 && (

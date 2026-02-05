@@ -9,7 +9,10 @@ const router = express.Router();
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
 
+  console.log('🔄 Tentativa de login recebida:', { username, password: password ? '***' : 'undefined' });
+
   if (!username || !password) {
+    console.log('❌ Dados incompletos:', { username: !!username, password: !!password });
     return res.status(400).json({ message: 'Usuário e senha são obrigatórios' });
   }
 
@@ -18,19 +21,26 @@ router.post('/login', (req, res) => {
     [username, username],
     async (err, user) => {
       if (err) {
+        console.error('❌ Erro na query:', err);
         return res.status(500).json({ message: 'Erro interno do servidor' });
       }
 
       if (!user) {
+        console.log('❌ Usuário não encontrado:', username);
         return res.status(401).json({ message: 'Credenciais inválidas' });
       }
 
+      console.log('✅ Usuário encontrado:', { id: user.id, username: user.username, role: user.role });
+
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
+        console.log('❌ Senha inválida para usuário:', username);
         return res.status(401).json({ message: 'Credenciais inválidas' });
       }
 
       const token = generateToken(user);
+      
+      console.log('✅ Login bem-sucedido:', { username: user.username, role: user.role });
       
       res.json({
         message: 'Login realizado com sucesso',

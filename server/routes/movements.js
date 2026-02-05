@@ -188,8 +188,8 @@ router.get('/', authenticateToken, (req, res) => {
   });
 });
 
-// Check-out (Saída de ativo)
-router.post('/checkout', authenticateToken, (req, res) => {
+// Check-out (Saída de ativo) - APENAS ADMIN
+router.post('/checkout', authenticateToken, requireAdmin, (req, res) => {
   const {
     asset_id,
     employee_name,
@@ -251,8 +251,8 @@ router.post('/checkout', authenticateToken, (req, res) => {
   });
 });
 
-// Check-in (Entrada de ativo)
-router.post('/checkin', authenticateToken, (req, res) => {
+// Check-in (Entrada de ativo) - APENAS ADMIN
+router.post('/checkin', authenticateToken, requireAdmin, (req, res) => {
   const {
     asset_id,
     employee_name,
@@ -314,8 +314,8 @@ router.post('/checkin', authenticateToken, (req, res) => {
   });
 });
 
-// Transferência para loja (Nova funcionalidade)
-router.post('/transfer', authenticateToken, (req, res) => {
+// Transferência para loja (Nova funcionalidade) - APENAS ADMIN
+router.post('/transfer', authenticateToken, requireAdmin, (req, res) => {
   console.log('Dados recebidos para transferência:', req.body);
   
   const {
@@ -878,8 +878,8 @@ router.get('/asset/:id/laudo', authenticateToken, (req, res) => {
     });
   });
 });
-// Alteração de status com registro de movimentação
-router.post('/status-change', authenticateToken, (req, res) => {
+// Alteração de status com registro de movimentação - APENAS ADMIN
+router.post('/status-change', authenticateToken, requireAdmin, (req, res) => {
   const {
     asset_id,
     old_status,

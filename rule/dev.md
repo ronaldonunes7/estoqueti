@@ -9,11 +9,147 @@
 - **Autenticação**: JWT com refresh tokens
 - **Estado**: React Query para server state, Context API para client state
 
+### 🚀 Pré-requisitos Verificados
+- ✅ **Node.js**: v22.22.0 (LTS recomendado)
+- ✅ **npm**: v10.9.4
+- ✅ **Git**: v2.53.0.windows.1
+- ✅ **Git Bash**: Terminal padrão configurado
+- ✅ **Dependências Backend**: Todas instaladas
+- ✅ **Dependências Frontend**: Todas instaladas
+
+### 🛠️ Ambiente de Desenvolvimento Configurado
+- **Sistema Operacional**: Windows
+- **Terminal**: Git Bash (configurado como padrão)
+- **Estrutura do Projeto**: Verificada e funcional
+- **Banco de Dados**: SQLite inicializado corretamente
+- **Servidor**: Rodando na porta 3001
+- **Frontend**: Rodando na porta 5173
+
 ---
 
-## 🎨 Design System & UI/UX Premium
+## 🚀 Comandos de Desenvolvimento (Windows + Git Bash)
 
-### Princípios de Design
+### Inicialização do Projeto
+```bash
+# Clonar o repositório
+git clone <repository-url>
+cd estoqueti
+
+# Instalar dependências (backend + frontend)
+npm run install:all
+
+# Ou instalar separadamente:
+npm install                    # Backend
+cd client && npm install      # Frontend
+```
+
+### Desenvolvimento Local
+```bash
+# Iniciar desenvolvimento (backend + frontend simultaneamente)
+npm run dev
+
+# Ou iniciar separadamente:
+npm run server:dev    # Backend apenas (porta 3001)
+npm run client:dev    # Frontend apenas (porta 5173)
+```
+
+### Scripts Úteis
+```bash
+# Build para produção
+npm run build
+
+# Iniciar servidor de produção
+npm start
+
+# Verificar dependências
+npm list --depth=0
+cd client && npm list --depth=0
+
+# Linting e formatação
+npm run lint
+npm run lint:fix
+```
+
+### Gerenciamento do Banco de Dados
+```bash
+# Backup do banco
+cp server/database.sqlite "backups/database-$(date +%Y%m%d-%H%M%S).sqlite"
+
+# Reset do banco (desenvolvimento)
+rm server/database.sqlite
+touch server/database/.reset_flag
+npm run server:dev  # Recria automaticamente
+```
+
+## ✅ Status Atual do Sistema
+
+### 🔧 Correções Implementadas
+1. **Tabela movements**: Corrigida criação com todas as colunas (store_id, quantity)
+2. **Constraint de status**: Atualizada para incluir 'Em Trânsito'
+3. **Inicialização do banco**: Simplificada e mais robusta
+4. **Remoção de código duplicado**: Eliminadas tentativas redundantes de ALTER TABLE
+5. **Tratamento de erros**: Melhorado para desenvolvimento
+6. **Configuração de portas**: Verificada e funcionando corretamente
+
+### 🚀 Sistema Funcionando
+- **Banco de Dados**: ✅ Inicializado e funcionando
+- **Tabela movements**: ✅ Criada com todas as colunas necessárias
+- **Tabela assets**: ✅ Atualizada com suporte a 'Em Trânsito'
+- **Usuários Padrão**: ✅ Criados (admin/admin123, gerencia/viewer123)
+- **Backend API**: ✅ Rodando na porta 3001 (http://localhost:3001)
+- **Frontend Vite**: ✅ Rodando na porta 5173 (http://localhost:5173)
+- **Proxy Configuration**: ✅ Frontend → Backend (/api → :3001)
+- **Rotas de Desenvolvimento**: ✅ Habilitadas
+- **Logs Estruturados**: ✅ Funcionando
+
+### 🌐 URLs de Acesso
+- **Aplicação Principal**: http://localhost:5173
+- **API Backend**: http://localhost:3001/api
+- **Health Check**: http://localhost:3001/health
+- **Documentação**: Disponível nos arquivos `/docs`
+
+---
+
+### 🌐 Arquitetura de Portas
+
+#### Configuração Padrão
+- **Frontend (Vite)**: Porta 5173
+  - Servidor de desenvolvimento React
+  - Proxy automático para API (/api → localhost:3001)
+  - Hot Module Replacement (HMR) ativo
+  
+- **Backend (Express)**: Porta 3001
+  - API REST completa
+  - Banco de dados SQLite
+  - Middleware de segurança ativo
+
+#### Proxy Configuration (Vite)
+```typescript
+// client/vite.config.ts
+server: {
+  port: 5173,
+  proxy: {
+    '/api': {
+      target: 'http://localhost:3001',
+      changeOrigin: true,
+      secure: false,
+    },
+  },
+}
+```
+
+#### CORS Configuration (Express)
+```javascript
+// server/index.js
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? false 
+    : ['http://localhost:5173', 'http://localhost:5174'],
+  credentials: true
+}));
+```
+
+---
 
 #### 1. Design Tokens
 ```typescript
@@ -468,7 +604,95 @@ export abstract class BaseRepository<T> {
 
 ---
 
-## 🧪 Validação Manual Estruturada
+## 🔧 Troubleshooting (Windows)
+
+### Problemas Comuns e Soluções
+
+#### 1. Node.js não encontrado
+```bash
+# Verificar se Node.js está instalado
+node --version
+npm --version
+
+# Se não estiver instalado, baixar de: https://nodejs.org/
+# Escolher versão LTS (Long Term Support)
+```
+
+#### 2. Erro "EBUSY: resource busy or locked"
+```bash
+# Parar todos os processos Node.js
+taskkill /f /im node.exe
+
+# Ou usar Ctrl+C no terminal e aguardar
+# Depois reiniciar: npm run dev
+```
+
+#### 3. Verificação de Portas e Serviços
+```bash
+# Verificar se as portas estão sendo usadas
+netstat -ano | findstr :3001  # Backend
+netstat -ano | findstr :5173  # Frontend
+
+# Testar conectividade dos serviços
+curl -s http://localhost:3001/health  # API Health Check
+curl -s -I http://localhost:5173      # Frontend Status
+
+# Verificar se ambos os serviços estão rodando
+# Deve mostrar [0] para backend e [1] para frontend nos logs
+npm run dev
+```
+
+#### 4. Porta já em uso
+```bash
+# Verificar processos usando as portas
+netstat -ano | findstr :3001
+netstat -ano | findstr :5173
+
+# Matar processo específico (substitua PID)
+taskkill /f /pid <PID>
+```
+
+#### 4. Problemas com SQLite
+```bash
+# Verificar se o banco existe
+ls -la server/database.sqlite
+
+# Se corrompido, resetar:
+rm server/database.sqlite
+touch server/database/.reset_flag
+npm run server:dev
+```
+
+#### 5. Dependências desatualizadas
+```bash
+# Verificar dependências desatualizadas
+npm outdated
+cd client && npm outdated
+
+# Atualizar (cuidado com breaking changes)
+npm update
+cd client && npm update
+```
+
+#### 6. Problemas de permissão (Windows)
+```bash
+# Executar Git Bash como Administrador se necessário
+# Ou verificar permissões da pasta do projeto
+```
+
+### 🚨 Logs de Erro Importantes
+
+#### Backend (Porta 3001)
+- **"SQLITE_ERROR: no such table"** → Banco precisa ser resetado
+- **"EADDRINUSE"** → Porta já em uso
+- **"MODULE_NOT_FOUND"** → Dependência faltando
+
+#### Frontend (Porta 5173)
+- **"Failed to resolve import"** → Dependência não instalada
+- **"Network Error"** → Backend não está rodando
+- **"CORS Error"** → Configuração de CORS no backend
+
+---
 
 ### 1. Checklist de Funcionalidades Críticas
 ```markdown
@@ -800,6 +1024,69 @@ fix(auth): resolve JWT token expiration issue
 docs(api): update authentication endpoints
 test(movements): add unit tests for checkout flow
 refactor(db): optimize asset queries
+```
+
+### 📤 Regra Obrigatória: Atualização do Repositório Remoto
+
+**IMPORTANTE**: Após finalização de correções e/ou novas funcionalidades, é **OBRIGATÓRIO** atualizar o repositório remoto.
+
+#### Fluxo de Atualização
+```bash
+# 1. Verificar status dos arquivos
+git status
+
+# 2. Adicionar arquivos modificados
+git add .
+
+# 3. Commit com mensagem descritiva seguindo convenção
+git commit -m "feat(inventory): implementar nova funcionalidade X"
+# ou
+git commit -m "fix(database): corrigir problema Y"
+
+# 4. Atualizar repositório remoto
+git push origin main
+# ou para branch específica
+git push origin feature/nome-da-feature
+```
+
+#### Checklist Pré-Push
+- [ ] Testar funcionalidades localmente
+- [ ] Verificar se não há erros no console
+- [ ] Confirmar que build está funcionando
+- [ ] Executar `npm run lint` e corrigir erros
+- [ ] Verificar se banco de dados está funcionando
+- [ ] Commit com mensagem clara e descritiva
+
+#### Mensagens de Commit Recomendadas
+```bash
+# Para correções
+git commit -m "fix(auth): corrigir validação de token JWT"
+git commit -m "fix(database): resolver problema de inicialização"
+
+# Para novas funcionalidades  
+git commit -m "feat(assets): adicionar busca avançada de ativos"
+git commit -m "feat(reports): implementar exportação PDF"
+
+# Para melhorias
+git commit -m "refactor(api): otimizar queries do dashboard"
+git commit -m "style(ui): melhorar responsividade da tabela"
+
+# Para documentação
+git commit -m "docs(readme): atualizar instruções de instalação"
+```
+
+#### ⚠️ Regras Importantes
+- **NUNCA** fazer push sem testar localmente
+- **SEMPRE** usar mensagens de commit descritivas
+- **OBRIGATÓRIO** fazer backup do banco antes de mudanças críticas
+- **RECOMENDADO** fazer pull antes de push para evitar conflitos
+
+```bash
+# Fluxo completo recomendado
+git pull origin main          # Atualizar com mudanças remotas
+git add .                     # Adicionar mudanças
+git commit -m "mensagem"      # Commit local
+git push origin main          # Enviar para repositório remoto
 ```
 
 ---

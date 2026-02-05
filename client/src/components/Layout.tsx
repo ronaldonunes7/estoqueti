@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermissions } from '../hooks/usePermissions'
 import { 
   LayoutDashboard, 
   Package, 
@@ -14,7 +15,9 @@ import {
   Settings,
   CheckCircle,
   Database,
-  Scan
+  Scan,
+  Shield,
+  Eye
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -24,25 +27,39 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth()
+  const permissions = usePermissions()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Ativos', href: '/assets', icon: Package },
-    { name: 'Lojas', href: '/stores', icon: Store },
-    { name: 'Transferência', href: '/transfer', icon: ArrowRightLeft },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, allowAll: true },
+    { name: 'Ativos', href: '/assets', icon: Package, allowAll: true, description: permissions.isAdmin ? 'Gerenciar ativos' : 'Visualizar ativos' },
+    { 
+      name: 'Lojas', 
+      href: '/stores', 
+      icon: Store, 
+      allowAll: true,
+      description: permissions.isAdmin ? 'Gerenciar lojas' : 'Visualizar lojas'
+    },
+    { 
+      name: 'Transferência', 
+      href: '/transfer', 
+      icon: ArrowRightLeft, 
+      adminOnly: true,
+      description: '🔒 Apenas Administradores'
+    },
     { 
       name: 'Scanner QR', 
       href: '/confirmar-recebimento', 
       icon: Scan,
       highlight: true,
+      allowAll: true,
       description: '📱 Confirmar Recebimento'
     },
-    { name: 'Movimentações', href: '/movements', icon: ArrowRightLeft },
-    { name: 'Relatórios', href: '/reports', icon: FileText },
-    ...(user?.role === 'admin' ? [
-      { name: 'Acessos Externos', href: '/external-access', icon: Settings }
+    { name: 'Movimentações', href: '/movements', icon: ArrowRightLeft, allowAll: true },
+    { name: 'Relatórios', href: '/reports', icon: FileText, allowAll: true },
+    ...(permissions.isAdmin ? [
+      { name: 'Acessos Externos', href: '/external-access', icon: Settings, adminOnly: true }
     ] : [])
   ]
 
@@ -131,6 +148,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-4 space-y-2">
             {navigation.map((item) => {
+              // Filtrar itens baseado em permissões
+              if (item.adminOnly && !permissions.isAdmin) {
+                return null
+              }
+
               const isItemActive = isActive(item.href)
               const isHighlighted = item.highlight
               const Icon = item.icon
@@ -164,6 +186,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       Novo
                     </span>
+                  )}
+                  {item.adminOnly && (
+                    <Shield className="h-3 w-3 text-blue-500" />
                   )}
                 </Link>
               )
@@ -202,19 +227,39 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1"></div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <div className="flex items-center gap-x-2">
-                <User className="h-5 w-5 text-gray-400" />
-                <span className="text-sm font-medium text-gray-700">
-                  {user?.username}
-                </span>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  user?.role === 'admin' 
-                    ? 'bg-blue-100 text-blue-800' 
-                    : 'bg-gray-100 text-gray-800'
+              <div className="flex items-center gap-x-3">
+                <div className="flex items-center gap-x-2">
+                  <User className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.username}
+                  </span>
+                </div>
+                
+                {/* Indicador de Role Detalhado */}
+                <div className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border ${
+                  permissions.isAdmin 
+                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                    : 'bg-gray-50 text-gray-700 border-gray-200'
                 }`}>
-                  {user?.role === 'admin' ? 'Admin' : 'Viewer'}
-                </span>
+                  {permissions.isAdmin ? (
+                    <>
+                      <Shield className="h-3 w-3" />
+                      <span>Administrador TI</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-3 w-3" />
+                      <span>Visualização</span>
+                    </>
+                  )}
+                </div>
+                
+                {/* Indicador de Permissões */}
+                <div className="text-xs text-gray-500">
+                  {permissions.isAdmin ? "Controle total" : "Somente leitura"}
+                </div>
               </div>
+              
               <button
                 onClick={logout}
                 className="flex items-center gap-x-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"

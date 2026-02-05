@@ -76,8 +76,11 @@ api.interceptors.response.use(
     
     const message = error.response?.data?.message || 'Erro de conexão com o servidor'
     
-    // Não mostrar toast para erros de rede em desenvolvimento
-    if (!error.message.includes('Network Error') || !import.meta.env?.DEV) {
+    // Não mostrar toast para erros de login (será tratado no contexto)
+    const isLoginError = error.config?.url?.includes('/auth/login')
+    
+    // Não mostrar toast para erros de rede em desenvolvimento ou erros de login
+    if ((!error.message.includes('Network Error') || !import.meta.env?.DEV) && !isLoginError) {
       toast.error(message)
     }
     

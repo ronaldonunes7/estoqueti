@@ -18,6 +18,8 @@ import {
 import api from '../services/api'
 import { Asset, AssetFormData } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermissions } from '../hooks/usePermissions'
+import { AdminOnly, AccessDenied } from '../components/RoleGuard'
 import { InteractiveStatusBadge } from '../components/InteractiveStatusBadge'
 import { BulkActionsBar } from '../components/BulkActionsBar'
 import { AddStockModal } from '../components/AddStockModal'
@@ -28,6 +30,7 @@ import toast from 'react-hot-toast'
 
 export const Assets: React.FC = () => {
   const { user } = useAuth()
+  const permissions = usePermissions()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -187,9 +190,19 @@ export const Assets: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ativos</h1>
-          <p className="text-gray-600">Gerenciar inventário de ativos de TI</p>
+          <p className="text-gray-600">
+            {permissions.isAdmin 
+              ? "Gerenciar inventário de ativos de TI" 
+              : "Visualizar inventário de ativos de TI (Somente Leitura)"
+            }
+          </p>
         </div>
-        {user?.role === 'admin' && (
+        
+        <AdminOnly fallback={
+          <div className="text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
+            👁️ Modo Visualização
+          </div>
+        }>
           <div className="flex gap-3">
             <button
               onClick={() => setShowAddStockModal(true)}
@@ -206,7 +219,7 @@ export const Assets: React.FC = () => {
               Novo Ativo
             </button>
           </div>
-        )}
+        </AdminOnly>
       </div>
 
       {/* Filtros */}
@@ -319,7 +332,7 @@ export const Assets: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {user?.role === 'admin' && (
+                    <AdminOnly>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button
                           onClick={(e) => handleSelectAll((e.target as HTMLInputElement).checked)}
@@ -332,7 +345,7 @@ export const Assets: React.FC = () => {
                           )}
                         </button>
                       </th>
-                    )}
+                    </AdminOnly>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ativo
                     </th>
@@ -354,17 +367,17 @@ export const Assets: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Localização
                     </th>
-                    {user?.role === 'admin' && (
+                    <AdminOnly>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ações
                       </th>
-                    )}
+                    </AdminOnly>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {assetsData?.assets?.map((asset: Asset) => (
                     <tr key={asset.id} className={getRowClassName(asset)}>
-                      {user?.role === 'admin' && (
+                      <AdminOnly>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => handleSelectAsset(asset.id, !selectedAssets.includes(asset.id))}
@@ -377,7 +390,7 @@ export const Assets: React.FC = () => {
                             )}
                           </button>
                         </td>
-                      )}
+                      </AdminOnly>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <AssetTooltip asset={asset}>
                           <div className="flex items-center">
@@ -427,7 +440,7 @@ export const Assets: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {asset.location || '-'}
                       </td>
-                      {user?.role === 'admin' && (
+                      <AdminOnly>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end gap-2">
                             {asset.asset_type === 'consumable' && (
@@ -448,18 +461,20 @@ export const Assets: React.FC = () => {
                             <button
                               onClick={() => handleEdit(asset)}
                               className="text-primary-600 hover:text-primary-900"
+                              title="Editar ativo"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(asset.id)}
                               className="text-red-600 hover:text-red-900"
+                              title="Deletar ativo"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
-                      )}
+                      </AdminOnly>
                     </tr>
                   ))}
                 </tbody>

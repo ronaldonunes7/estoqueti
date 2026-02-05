@@ -12,16 +12,21 @@ import {
   User,
   MapPin,
   TrendingUp,
-  Activity
+  Activity,
+  Send,
+  Plus
 } from 'lucide-react'
 import api from '../services/api'
 import { Asset, Store } from '../types'
+import { usePermissions } from '../hooks/usePermissions'
+import { AdminOnly, AccessDenied } from '../components/RoleGuard'
 import { AssetDetailDrawer } from '../components/AssetDetailDrawer'
 import toast from 'react-hot-toast'
 
 export const UnitInventory: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const permissions = usePermissions()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [showDrawer, setShowDrawer] = useState(false)

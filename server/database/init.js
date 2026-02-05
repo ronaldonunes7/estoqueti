@@ -60,114 +60,28 @@ const initDatabase = () => {
         `);
 
         // Tabela de movimentações (histórico imutável) - expandida
-        db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='movements'", (err, row) => {
-          if (!row) {
-            // Tabela não existe, criar nova
-            db.run(`
-              CREATE TABLE movements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                asset_id INTEGER NOT NULL,
-                type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência', 'Recebimento')),
-                employee_name TEXT NOT NULL,
-                destination TEXT,
-                store_id INTEGER,
-                quantity INTEGER DEFAULT 1,
-                responsible_technician TEXT NOT NULL,
-                observations TEXT,
-                movement_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                created_by INTEGER NOT NULL,
-                FOREIGN KEY (asset_id) REFERENCES assets (id),
-                FOREIGN KEY (store_id) REFERENCES stores (id),
-                FOREIGN KEY (created_by) REFERENCES users (id)
-              )
-            `);
-            console.log('✅ Tabela movements criada com sucesso!');
+        db.run(`
+          CREATE TABLE IF NOT EXISTS movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            asset_id INTEGER NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência', 'Recebimento', 'ENTRADA_ESTOQUE')),
+            employee_name TEXT NOT NULL,
+            destination TEXT,
+            store_id INTEGER,
+            quantity INTEGER DEFAULT 1,
+            responsible_technician TEXT NOT NULL,
+            observations TEXT,
+            movement_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_by INTEGER NOT NULL,
+            FOREIGN KEY (asset_id) REFERENCES assets (id),
+            FOREIGN KEY (store_id) REFERENCES stores (id),
+            FOREIGN KEY (created_by) REFERENCES users (id)
+          )
+        `, (err) => {
+          if (err) {
+            console.error('Erro ao criar tabela movements:', err);
           } else {
-            // Tabela existe, verificar se tem a constraint correta
-            db.get("SELECT sql FROM sqlite_master WHERE type='table' AND name='movements'", (err, tableInfo) => {
-              if (err) {
-                console.error('Erro ao verificar tabela movements:', err);
-                return;
-              }
-              
-              console.log('🔍 Verificando constraint da tabela movements...');
-              const hasRecebimento = tableInfo && tableInfo.sql.includes('Recebimento');
-              const hasTransferencia = tableInfo && tableInfo.sql.includes('Transferência');
-              
-              if (!hasRecebimento || !hasTransferencia) {
-                console.log('⚠️ Atualizando tabela movements para incluir Transferência e Recebimento...');
-                console.log('Current SQL:', tableInfo?.sql);
-                
-                // Backup dos dados existentes
-                db.run(`CREATE TABLE movements_backup AS SELECT * FROM movements`, (err) => {
-                  if (err) {
-                    console.error('Erro ao criar backup:', err);
-                    return;
-                  }
-                  
-                  // Dropar tabela antiga
-                  db.run(`DROP TABLE movements`, (err) => {
-                    if (err) {
-                      console.error('Erro ao dropar tabela:', err);
-                      return;
-                    }
-                    
-                    // Recriar com nova constraint
-                    db.run(`
-                      CREATE TABLE movements (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        asset_id INTEGER NOT NULL,
-                        type TEXT NOT NULL CHECK(type IN ('Entrada', 'Saída', 'Manutenção', 'Descarte', 'Transferência', 'Recebimento')),
-                        employee_name TEXT NOT NULL,
-                        destination TEXT,
-                        store_id INTEGER,
-                        quantity INTEGER DEFAULT 1,
-                        responsible_technician TEXT NOT NULL,
-                        observations TEXT,
-                        movement_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        created_by INTEGER NOT NULL,
-                        FOREIGN KEY (asset_id) REFERENCES assets (id),
-                        FOREIGN KEY (store_id) REFERENCES stores (id),
-                        FOREIGN KEY (created_by) REFERENCES users (id)
-                      )
-                    `, (err) => {
-                      if (err) {
-                        console.error('Erro ao recriar tabela:', err);
-                        return;
-                      }
-                      
-                      // Restaurar dados (com valores padrão para novas colunas)
-                      db.run(`
-                        INSERT INTO movements (
-                          id, asset_id, type, employee_name, destination, responsible_technician, 
-                          observations, movement_date, created_by, store_id, quantity
-                        )
-                        SELECT 
-                          id, asset_id, type, employee_name, destination, responsible_technician, 
-                          observations, movement_date, created_by, NULL, 1
-                        FROM movements_backup
-                      `, (err) => {
-                        if (err) {
-                          console.error('Erro ao restaurar dados:', err);
-                          return;
-                        }
-                        
-                        // Limpar backup
-                        db.run(`DROP TABLE movements_backup`, (err) => {
-                          if (err) {
-                            console.error('Erro ao limpar backup:', err);
-                          } else {
-                            console.log('✅ Tabela movements atualizada com sucesso!');
-                          }
-                        });
-                      });
-                    });
-                  });
-                });
-              } else {
-                console.log('✅ Tabela movements já está atualizada!');
-              }
-            });
+            console.log('✅ Tabela movements criada/verificada com sucesso!');
           }
         });
 
@@ -238,7 +152,8 @@ const initDatabase = () => {
                       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                       barcode TEXT UNIQUE,
                       asset_type TEXT NOT NULL DEFAULT 'unique' CHECK(asset_type IN ('unique', 'consumable')),
-                      stock_quantity INTEGER DEFAULT 0
+                      stock_quantity INTEGER DEFAULT 0,
+                      min_stock INTEGER DEFAULT 0
                     )
                   `, (err) => {
                     if (err) {
@@ -251,7 +166,7 @@ const initDatabase = () => {
                       INSERT INTO assets_new 
                       SELECT id, name, brand_model, serial_number, patrimony_tag, category, status, 
                              purchase_date, purchase_value, warranty_expiry, location, notes, 
-                             created_at, updated_at, barcode, asset_type, stock_quantity
+                             created_at, updated_at, barcode, asset_type, stock_quantity, min_stock
                       FROM assets
                     `, (err) => {
                       if (err) {
@@ -294,19 +209,6 @@ const initDatabase = () => {
                 console.log('✅ Status de ativos normalizados');
               }
             });
-          }
-        });
-
-        // Expandir tabela de movimentações (caso já exista sem as novas colunas)
-        db.run(`ALTER TABLE movements ADD COLUMN store_id INTEGER`, (err) => {
-          if (err && !err.message.includes('duplicate column')) {
-            console.error('Erro ao adicionar coluna store_id:', err);
-          }
-        });
-        
-        db.run(`ALTER TABLE movements ADD COLUMN quantity INTEGER DEFAULT 1`, (err) => {
-          if (err && !err.message.includes('duplicate column')) {
-            console.error('Erro ao adicionar coluna quantity:', err);
           }
         });
 

@@ -37,16 +37,21 @@ export const DevTools: React.FC = () => {
   // Mutation para reset do banco
   const resetMutation = useMutation(
     async () => {
+      console.log('🔄 Iniciando reset do banco via API...');
       const response = await api.post('/dev/reset-database')
+      console.log('✅ Reset concluído:', response.data);
       return response.data
     },
     {
       onSuccess: (data) => {
+        console.log('✅ Reset bem-sucedido:', data);
         toast.success('Reset do banco concluído com sucesso!')
         setConfirmReset(false)
         refetch()
       },
       onError: (error: any) => {
+        console.error('❌ Erro durante reset:', error);
+        console.error('❌ Resposta do erro:', error.response?.data);
         toast.error(error.response?.data?.message || 'Erro durante reset')
         setConfirmReset(false)
       }

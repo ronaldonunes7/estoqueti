@@ -15,11 +15,14 @@ import {
 import api from '../services/api'
 import { Asset, Store as StoreType, TransferFormData } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermissions } from '../hooks/usePermissions'
+import { AdminOnly, AccessDenied } from '../components/RoleGuard'
 import { ShippingLabelGenerator } from '../components/ShippingLabelGenerator'
 import toast from 'react-hot-toast'
 
 export const Transfer: React.FC = () => {
   const { user } = useAuth()
+  const permissions = usePermissions()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
@@ -48,6 +51,15 @@ export const Transfer: React.FC = () => {
   })
 
   const quantity = watch('quantity')
+
+  // Verificar se usuário tem permissão para transferir
+  if (!permissions.canTransferAssets) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <AccessDenied message="Apenas administradores podem realizar transferências de ativos. Entre em contato com a equipe de TI." />
+      </div>
+    )
+  }
 
   // Pré-selecionar ativo baseado no parâmetro da URL (vindo do QR Scanner)
   useEffect(() => {

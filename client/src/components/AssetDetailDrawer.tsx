@@ -11,16 +11,24 @@ import {
   Activity,
   FileText,
   Wrench,
-  TrendingUp
+  TrendingUp,
+  Send,
+  Trash2,
+  Plus
 } from 'lucide-react'
 import api from '../services/api'
 import { Asset } from '../types'
+import { usePermissions } from '../hooks/usePermissions'
+import { AdminOnly } from './RoleGuard'
 
 interface AssetDetailDrawerProps {
   asset: Asset | null
   isOpen: boolean
   onClose: () => void
   storeId: number
+  onTransfer?: (asset: Asset) => void
+  onAddStock?: (asset: Asset) => void
+  onDiscard?: (asset: Asset) => void
 }
 
 interface AssetHistory {
@@ -37,8 +45,12 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
   asset,
   isOpen,
   onClose,
-  storeId
+  storeId,
+  onTransfer,
+  onAddStock,
+  onDiscard
 }) => {
+  const permissions = usePermissions()
   // Buscar histórico do ativo na unidade
   const { data: historyData, isLoading } = useQuery(
     ['asset-unit-history', asset?.id, storeId],
@@ -283,6 +295,50 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
               </div>
             )}
           </div>
+
+          {/* Botões de Ação - Apenas para Administradores */}
+          <AdminOnly>
+            <div className="border-t border-gray-200 p-6">
+              <h3 className="text-sm font-medium text-gray-900 mb-4">Ações Administrativas</h3>
+              <div className="flex flex-wrap gap-3">
+                {/* Transferir Produto */}
+                <button
+                  onClick={() => onTransfer?.(asset)}
+                  className="btn btn-primary flex items-center gap-2"
+                  title="Transferir para outra unidade"
+                >
+                  <Send className="w-4 h-4" />
+                  Transferir Produto
+                </button>
+
+                {/* Adicionar Saldo (apenas para consumíveis) */}
+                {asset.asset_type === 'consumable' && (
+                  <button
+                    onClick={() => onAddStock?.(asset)}
+                    className="btn btn-success flex items-center gap-2"
+                    title="Adicionar saldo ao estoque"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar Saldo
+                  </button>
+                )}
+
+                {/* Dar Baixa */}
+                <button
+                  onClick={() => onDiscard?.(asset)}
+                  className="btn btn-danger flex items-center gap-2"
+                  title="Dar baixa no ativo"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Dar Baixa
+                </button>
+              </div>
+              
+              <div className="mt-3 text-xs text-gray-500">
+                ⚠️ Estas ações são restritas à equipe de TI (Administradores)
+              </div>
+            </div>
+          </AdminOnly>
         </div>
       </div>
     </div>

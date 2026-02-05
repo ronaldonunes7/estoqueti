@@ -4,6 +4,23 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Rota principal do dashboard (GET /) - SEM AUTENTICAÇÃO PARA TESTE
+router.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Dashboard API funcionando',
+    timestamp: new Date().toISOString(),
+    routes: [
+      '/health',
+      '/counts', 
+      '/metrics',
+      '/warranty-alerts',
+      '/recent-movements',
+      '/low-stock-items'
+    ]
+  });
+});
+
 // Endpoint de teste para verificar se a API está funcionando
 router.get('/health', (req, res) => {
   res.json({ 

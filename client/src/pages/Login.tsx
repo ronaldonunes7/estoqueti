@@ -21,12 +21,17 @@ export const Login: React.FC = () => {
   }
 
   const onSubmit = async (data: LoginForm) => {
+    console.log('🔄 Tentando fazer login no frontend:', { username: data.username })
     setLoading(true)
     try {
       const success = await login(data.username, data.password)
+      console.log('📊 Resultado do login:', success)
       if (!success) {
+        console.log('❌ Login falhou')
         // Error is handled by the API interceptor
       }
+    } catch (error) {
+      console.error('❌ Erro no onSubmit:', error)
     } finally {
       setLoading(false)
     }

@@ -63,7 +63,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
+      console.log('🔄 Tentando fazer login com:', { username })
       const response = await api.post('/auth/login', { username, password })
+      console.log('✅ Resposta do login:', response.data)
+      
       const { token, user: userData } = response.data
 
       localStorage.setItem('token', token)
@@ -72,7 +75,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       toast.success('Login realizado com sucesso!')
       return true
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Erro no login:', error)
+      console.error('❌ Resposta do erro:', error.response?.data)
+      toast.error(error.response?.data?.message || 'Erro ao fazer login')
       return false
     }
   }
