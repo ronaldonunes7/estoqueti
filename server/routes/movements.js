@@ -942,7 +942,17 @@ router.post('/status-change', authenticateToken, requireAdmin, (req, res) => {
             movementDescription += ' - Item indisponível para uso';
           }
 
-          // Registrar movimentação
+          // Registrar movimentação usando tipo "Manutenção" para mudanças de status
+          // (já que "Alteração de Status" não está no CHECK constraint)
+          let movementType = 'Entrada'; // Tipo padrão
+          if (new_status === 'Manutenção') {
+            movementType = 'Manutenção';
+          } else if (new_status === 'Em Uso') {
+            movementType = 'Saída';
+          } else if (new_status === 'Disponível' && old_status === 'Em Uso') {
+            movementType = 'Entrada';
+          }
+
           const movementQuery = `
             INSERT INTO movements (
               asset_id, type, employee_name, destination, responsible_technician, 
@@ -956,7 +966,7 @@ router.post('/status-change', authenticateToken, requireAdmin, (req, res) => {
 
           db.run(movementQuery, [
             asset_id, 
-            'Alteração de Status',
+            movementType,
             employee_name || req.user.username,
             movementDescription,
             req.user.username,
