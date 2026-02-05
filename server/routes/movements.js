@@ -935,6 +935,7 @@ router.get('/pending-receipts', authenticateToken, (req, res) => {
       a.name as asset_name,
       a.brand_model as asset_brand_model,
       a.barcode as asset_barcode,
+      a.asset_type,
       m.quantity,
       origin_store.name as origin_store,
       dest_store.name as destination_store,
