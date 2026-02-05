@@ -61,6 +61,21 @@ export const UnitInventory: React.FC = () => {
     setShowDrawer(true)
   }
 
+  const handleTransfer = (asset: Asset) => {
+    // Navegar para a página de transferência com o ativo pré-selecionado
+    navigate('/transfer', { state: { asset, fromStore: storeData } })
+  }
+
+  const handleAddStock = (asset: Asset) => {
+    // Navegar para a página de ativos com modal de adicionar estoque
+    navigate('/assets', { state: { addStockAsset: asset } })
+  }
+
+  const handleDiscard = (asset: Asset) => {
+    // Navegar para a página de ativos com modal de dar baixa
+    navigate('/assets', { state: { discardAsset: asset } })
+  }
+
   const handleExportPDF = async () => {
     try {
       const response = await api.get(`/stores/${id}/inventory/export`, {
@@ -373,6 +388,9 @@ export const UnitInventory: React.FC = () => {
           setSelectedAsset(null)
         }}
         storeId={parseInt(id || '0')}
+        onTransfer={handleTransfer}
+        onAddStock={handleAddStock}
+        onDiscard={handleDiscard}
       />
     </div>
   )
