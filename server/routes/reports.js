@@ -177,6 +177,142 @@ router.get('/movements/csv', authenticateToken, (req, res) => {
   });
 });
 
+// Exportar relatório de movimentações em PDF
+router.get('/movements/pdf', authenticateToken, (req, res) => {
+  console.log('🔍 Gerando relatório PDF de movimentações...');
+  console.log('📊 Filtros recebidos:', req.query);
+  
+  const { start_date, end_date, type } = req.query;
+  
+  let query = `
+    SELECT 
+      m.*,
+      a.name as asset_name,
+      a.patrimony_tag,
+      a.serial_number,
+      u.username as created_by_username
+    FROM movements m
+    JOIN assets a ON m.asset_id = a.id
+    JOIN users u ON m.created_by = u.id
+    WHERE 1=1
+  `;
+  let params = [];
+
+  if (start_date) {
+    query += ' AND DATE(m.movement_date) >= ?';
+    params.push(start_date);
+  }
+
+  if (end_date) {
+    query += ' AND DATE(m.movement_date) <= ?';
+    params.push(end_date);
+  }
+
+  if (type) {
+    query += ' AND m.type = ?';
+    params.push(type);
+  }
+
+  query += ' ORDER BY m.movement_date DESC';
+
+  db.all(query, params, (err, movements) => {
+    if (err) {
+      console.error('❌ Erro na query de movimentações:', err);
+      return res.status(500).json({ message: 'Erro ao gerar relatório' });
+    }
+
+    console.log(`📊 Encontradas ${movements.length} movimentações para o relatório`);
+
+    try {
+      const doc = new PDFDocument({ margin: 50 });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `relatorio-movimentacoes-${timestamp}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      doc.pipe(res);
+
+      // Cabeçalho
+      doc.fontSize(20).text('Relatório de Movimentações', { align: 'center' });
+      doc.fontSize(12).text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
+      
+      // Filtros aplicados
+      if (start_date || end_date || type) {
+        doc.moveDown(0.5);
+        doc.fontSize(10).text('Filtros aplicados:', { underline: true });
+        if (start_date) doc.text(`Data inicial: ${new Date(start_date).toLocaleDateString('pt-BR')}`);
+        if (end_date) doc.text(`Data final: ${new Date(end_date).toLocaleDateString('pt-BR')}`);
+        if (type) doc.text(`Tipo: ${type}`);
+      }
+      
+      doc.moveDown();
+
+      // Resumo por tipo
+      const typeCount = {};
+      movements.forEach(mov => {
+        typeCount[mov.type] = (typeCount[mov.type] || 0) + 1;
+      });
+
+      doc.fontSize(14).text('Resumo por Tipo:', { underline: true });
+      doc.fontSize(12);
+      Object.entries(typeCount).forEach(([type, count]) => {
+        doc.text(`${type}: ${count} movimentações`);
+      });
+      doc.moveDown();
+
+      // Lista de movimentações
+      doc.fontSize(14).text('Histórico de Movimentações:', { underline: true });
+      doc.fontSize(9);
+
+      movements.forEach((mov, index) => {
+        // Adicionar nova página a cada 10 movimentações
+        if (index > 0 && index % 10 === 0) {
+          doc.addPage();
+        }
+
+        const movDate = new Date(mov.movement_date);
+        doc.fontSize(10).text(`${index + 1}. ${mov.type} - ${movDate.toLocaleString('pt-BR')}`, { 
+          underline: true 
+        });
+        doc.fontSize(9);
+        doc.text(`   Ativo: ${mov.asset_name} (${mov.patrimony_tag})`);
+        doc.text(`   Colaborador: ${mov.employee_name}`);
+        doc.text(`   Técnico: ${mov.responsible_technician}`);
+        if (mov.destination) {
+          doc.text(`   Destino: ${mov.destination}`);
+        }
+        if (mov.observations) {
+          doc.text(`   Obs: ${mov.observations.substring(0, 100)}${mov.observations.length > 100 ? '...' : ''}`);
+        }
+        doc.text(`   Registrado por: ${mov.created_by_username}`);
+        doc.moveDown(0.5);
+      });
+
+      // Rodapé
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(8).text(
+          `Página ${i + 1} de ${pages.count}`,
+          50,
+          doc.page.height - 50,
+          { align: 'center' }
+        );
+      }
+
+      doc.end();
+      console.log('✅ Relatório PDF de movimentações gerado com sucesso');
+    } catch (pdfError) {
+      console.error('❌ Erro ao gerar PDF:', pdfError);
+      res.status(500).json({ 
+        message: 'Erro ao gerar PDF',
+        error: pdfError.message
+      });
+    }
+  });
+});
+
 // Exportar relatório em PDF (temporariamente sem autenticação para debug)
 router.get('/assets/pdf', (req, res) => {
   console.log('🔍 Gerando relatório PDF de ativos...');
