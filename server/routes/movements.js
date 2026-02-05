@@ -882,44 +882,105 @@ router.get('/asset/:id/laudo', authenticateToken, (req, res) => {
 router.post('/status-change', authenticateToken, requireAdmin, (req, res) => {
   const {
     asset_id,
-    old_status,
     new_status,
+    employee_name,
     observations,
-    type
+    store_id
   } = req.body;
 
-  if (!asset_id || !new_status || !observations) {
+  if (!asset_id || !new_status) {
     return res.status(400).json({ 
-      message: 'Campos obrigatórios: asset_id, new_status, observations' 
+      message: 'Campos obrigatórios: asset_id, new_status' 
     });
   }
 
-  // Registrar movimentação sem transação manual
-  const movementQuery = `
-    INSERT INTO movements (
-      asset_id, type, employee_name, destination, responsible_technician, 
-      observations, created_by, quantity
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+  // Validação: Se novo status é "Em Uso", employee_name é obrigatório
+  if (new_status === 'Em Uso' && !employee_name) {
+    return res.status(400).json({ 
+      message: 'Campo employee_name é obrigatório para status "Em Uso"' 
+    });
+  }
 
-  db.run(movementQuery, [
-    asset_id, 
-    type || 'Alteração de Status',
-    'Sistema', // employee_name
-    `Status alterado: ${old_status} → ${new_status}`, // destination
-    req.user.username, // responsible_technician
-    observations,
-    req.user.id,
-    1
-  ], function(err) {
-    if (err) {
-      console.error('Erro ao registrar movimentação:', err);
-      return res.status(500).json({ message: 'Erro ao registrar movimentação' });
-    }
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
 
-    res.json({
-      message: 'Status alterado e movimentação registrada com sucesso',
-      movement_id: this.lastID
+    // Buscar status atual do ativo
+    db.get('SELECT status FROM assets WHERE id = ?', [asset_id], (err, asset) => {
+      if (err) {
+        console.error('Erro ao buscar ativo:', err);
+        db.run('ROLLBACK');
+        return res.status(500).json({ message: 'Erro ao buscar ativo' });
+      }
+
+      if (!asset) {
+        db.run('ROLLBACK');
+        return res.status(404).json({ message: 'Ativo não encontrado' });
+      }
+
+      const old_status = asset.status;
+
+      // Atualizar status do ativo
+      db.run(
+        'UPDATE assets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [new_status, asset_id],
+        (err) => {
+          if (err) {
+            console.error('Erro ao atualizar status:', err);
+            db.run('ROLLBACK');
+            return res.status(500).json({ message: 'Erro ao atualizar status' });
+          }
+
+          // Preparar descrição da movimentação
+          let movementDescription = `Status alterado de "${old_status}" para "${new_status}"`;
+          if (employee_name && new_status === 'Em Uso') {
+            movementDescription += ` - Responsável: ${employee_name}`;
+          }
+          if (old_status === 'Em Uso' && new_status === 'Disponível') {
+            movementDescription += ' - Item liberado e retornado ao estoque';
+          }
+          if (new_status === 'Manutenção') {
+            movementDescription += ' - Item indisponível para uso';
+          }
+
+          // Registrar movimentação
+          const movementQuery = `
+            INSERT INTO movements (
+              asset_id, type, employee_name, destination, responsible_technician, 
+              observations, created_by, quantity, store_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          const finalObservations = observations 
+            ? `${movementDescription}. ${observations}`
+            : movementDescription;
+
+          db.run(movementQuery, [
+            asset_id, 
+            'Alteração de Status',
+            employee_name || req.user.username,
+            movementDescription,
+            req.user.username,
+            finalObservations,
+            req.user.id,
+            1,
+            store_id || null
+          ], function(err) {
+            if (err) {
+              console.error('Erro ao registrar movimentação:', err);
+              db.run('ROLLBACK');
+              return res.status(500).json({ message: 'Erro ao registrar movimentação' });
+            }
+
+            db.run('COMMIT');
+            res.json({
+              message: 'Status alterado e movimentação registrada com sucesso',
+              movement_id: this.lastID,
+              old_status,
+              new_status
+            });
+          });
+        }
+      );
     });
   });
 });

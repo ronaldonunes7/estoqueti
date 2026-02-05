@@ -14,13 +14,15 @@ import {
   TrendingUp,
   Activity,
   Send,
-  Plus
+  Plus,
+  RefreshCw
 } from 'lucide-react'
 import api from '../services/api'
 import { Asset, Store } from '../types'
 import { usePermissions } from '../hooks/usePermissions'
 import { AdminOnly, AccessDenied } from '../components/RoleGuard'
 import { AssetDetailDrawer } from '../components/AssetDetailDrawer'
+import { ChangeStatusModal } from '../components/ChangeStatusModal'
 import toast from 'react-hot-toast'
 
 export const UnitInventory: React.FC = () => {
@@ -30,6 +32,8 @@ export const UnitInventory: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [showDrawer, setShowDrawer] = useState(false)
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [assetToChangeStatus, setAssetToChangeStatus] = useState<Asset | null>(null)
 
   // Buscar dados da unidade
   const { data: storeData, isLoading: storeLoading } = useQuery(
@@ -59,6 +63,11 @@ export const UnitInventory: React.FC = () => {
   const handleAssetClick = (asset: Asset) => {
     setSelectedAsset(asset)
     setShowDrawer(true)
+  }
+
+  const handleChangeStatus = (asset: Asset) => {
+    setAssetToChangeStatus(asset)
+    setShowStatusModal(true)
   }
 
   const handleTransfer = (asset: Asset) => {
@@ -349,13 +358,28 @@ export const UnitInventory: React.FC = () => {
                     }
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleAssetClick(asset)}
-                      className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Detalhes
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleAssetClick(asset)}
+                        className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                        title="Ver detalhes"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Detalhes
+                      </button>
+                      
+                      {/* Botão Alterar Status - Apenas Admin */}
+                      {permissions.isAdmin && (
+                        <button
+                          onClick={() => handleChangeStatus(asset)}
+                          className="text-purple-600 hover:text-purple-900 flex items-center gap-1 ml-2"
+                          title="Alterar status do ativo"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Status
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -392,6 +416,19 @@ export const UnitInventory: React.FC = () => {
         onAddStock={handleAddStock}
         onDiscard={handleDiscard}
       />
+
+      {/* Modal de Alteração de Status */}
+      {assetToChangeStatus && (
+        <ChangeStatusModal
+          asset={assetToChangeStatus}
+          isOpen={showStatusModal}
+          onClose={() => {
+            setShowStatusModal(false)
+            setAssetToChangeStatus(null)
+          }}
+          storeId={parseInt(id || '0')}
+        />
+      )}
     </div>
   )
 }
