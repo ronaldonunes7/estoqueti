@@ -31,9 +31,9 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
 
   const bulkUpdateMutation = useMutation(
     async ({ status, observations }: { status: string; observations: string }) => {
-      // Atualizar status de todos os ativos selecionados
+      // Atualizar status de todos os ativos selecionados usando a rota específica
       const promises = selectedAssets.map(asset => 
-        api.put(`/assets/${asset.id}`, { status })
+        api.patch(`/assets/${asset.id}/status`, { status })
       )
       
       await Promise.all(promises)
@@ -72,7 +72,9 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
     if (newStatus === 'Descartado') return 'Descarte'
     if (oldStatus === 'Disponível' && newStatus === 'Em Uso') return 'Saída'
     if (oldStatus === 'Em Uso' && newStatus === 'Disponível') return 'Entrada'
-    return 'Alteração de Status'
+    if (newStatus === 'Disponível') return 'Entrada' // Qualquer coisa voltando para disponível
+    if (newStatus === 'Em Uso') return 'Saída' // Qualquer coisa indo para em uso
+    return 'Entrada' // Fallback seguro
   }
 
   const handleBulkUpdate = () => {

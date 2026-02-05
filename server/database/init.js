@@ -324,46 +324,62 @@ const initDatabase = () => {
           VALUES ('gerencia', 'gerencia@empresa.com', ?, 'viewer')
         `, [viewerPassword]);
 
-        // Inserir algumas lojas de exemplo
-        const sampleStores = [
-          ['Shopping Prohospital', 'Av. Dom Luís, 1200', '1200', 'Meireles', 'Fortaleza', '60160-230', '(85) 3456-7890', 'João Silva'],
-          ['Shopping Iguatemi', 'Av. Washington Soares, 85', '85', 'Edson Queiroz', 'Fortaleza', '60811-341', '(85) 3456-7891', 'Maria Santos'],
-          ['North Shopping', 'Av. Bezerra de Menezes, 2450', '2450', 'São Gerardo', 'Fortaleza', '60325-005', '(85) 3456-7892', 'Pedro Costa']
-        ];
+        // Verificar se foi feito reset recente (não inserir dados de exemplo)
+        const fs = require('fs');
+        const path = require('path');
+        const flagPath = path.join(__dirname, '.reset_flag');
+        
+        if (fs.existsSync(flagPath)) {
+          console.log('🚩 Reset detectado - pulando inserção de dados de exemplo');
+          // Remover a flag para próximas inicializações
+          try {
+            fs.unlinkSync(flagPath);
+          } catch (err) {
+            console.error('Erro ao remover flag de reset:', err);
+          }
+        } else {
+          // Inserir algumas lojas de exemplo (apenas se não houve reset)
+          const sampleStores = [
+            ['Shopping Prohospital', 'Av. Dom Luís, 1200', '1200', 'Meireles', 'Fortaleza', '60160-230', '(85) 3456-7890', 'João Silva'],
+            ['Shopping Iguatemi', 'Av. Washington Soares, 85', '85', 'Edson Queiroz', 'Fortaleza', '60811-341', '(85) 3456-7891', 'Maria Santos'],
+            ['North Shopping', 'Av. Bezerra de Menezes, 2450', '2450', 'São Gerardo', 'Fortaleza', '60325-005', '(85) 3456-7892', 'Pedro Costa']
+          ];
 
-        const insertStore = db.prepare(`
-          INSERT OR IGNORE INTO stores (name, address, number, neighborhood, city, cep, phone, responsible) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+          const insertStore = db.prepare(`
+            INSERT OR IGNORE INTO stores (name, address, number, neighborhood, city, cep, phone, responsible) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
 
-        sampleStores.forEach(store => {
-          insertStore.run(store);
-        });
+          sampleStores.forEach(store => {
+            insertStore.run(store);
+          });
 
-        insertStore.finalize();
-        console.log('✅ Lojas de exemplo inseridas:', sampleStores.length);
+          insertStore.finalize();
+          console.log('✅ Lojas de exemplo inseridas:', sampleStores.length);
 
-        // Inserir alguns ativos de exemplo (atualizados com valores)
-        const sampleAssets = [
-          ['Notebook Dell Latitude 5520', 'Dell Latitude 5520', 'DL5520001', 'PAT001', '7891234567890', 'Hardware', 'Disponível', 'unique', 1, 0, '2024-01-15', 3500.00, '2027-01-15'],
-          ['Monitor LG 24"', 'LG 24MK430H', 'LG24001', 'PAT002', '7891234567891', 'Periférico', 'Disponível', 'unique', 1, 0, '2024-02-10', 850.00, '2027-02-10'],
-          ['Licença Office 365', 'Microsoft Office 365', 'MS365001', 'PAT003', '7891234567892', 'Licença', 'Em Uso', 'unique', 1, 0, '2024-01-01', 450.00, '2025-01-01'],
-          ['Desktop HP EliteDesk', 'HP EliteDesk 800 G6', 'HP800001', 'PAT004', '7891234567893', 'Hardware', 'Manutenção', 'unique', 1, 0, '2023-12-05', 2800.00, '2026-12-05'],
-          ['Cabo HDMI 2m', 'Cabo HDMI', '', '', '7891234567894', 'Insumos', 'Disponível', 'consumable', 50, 10, '2024-03-01', 25.00, null],
-          ['Mouse USB', 'Mouse Óptico USB', '', '', '7891234567895', 'Insumos', 'Disponível', 'consumable', 25, 5, '2024-03-01', 35.00, null],
-          ['Teclado USB', 'Teclado ABNT2 USB', '', '', '7891234567896', 'Insumos', 'Disponível', 'consumable', 15, 3, '2024-03-01', 120.00, null]
-        ];
+          // Inserir alguns ativos de exemplo (atualizados com valores)
+          const sampleAssets = [
+            ['Notebook Dell Latitude 5520', 'Dell Latitude 5520', 'DL5520001', 'PAT001', '7891234567890', 'Hardware', 'Disponível', 'unique', 1, 0, '2024-01-15', 3500.00, '2027-01-15'],
+            ['Monitor LG 24"', 'LG 24MK430H', 'LG24001', 'PAT002', '7891234567891', 'Periférico', 'Disponível', 'unique', 1, 0, '2024-02-10', 850.00, '2027-02-10'],
+            ['Licença Office 365', 'Microsoft Office 365', 'MS365001', 'PAT003', '7891234567892', 'Licença', 'Em Uso', 'unique', 1, 0, '2024-01-01', 450.00, '2025-01-01'],
+            ['Desktop HP EliteDesk', 'HP EliteDesk 800 G6', 'HP800001', 'PAT004', '7891234567893', 'Hardware', 'Manutenção', 'unique', 1, 0, '2023-12-05', 2800.00, '2026-12-05'],
+            ['Cabo HDMI 2m', 'Cabo HDMI', '', '', '7891234567894', 'Insumos', 'Disponível', 'consumable', 50, 10, '2024-03-01', 25.00, null],
+            ['Mouse USB', 'Mouse Óptico USB', '', '', '7891234567895', 'Insumos', 'Disponível', 'consumable', 25, 5, '2024-03-01', 35.00, null],
+            ['Teclado USB', 'Teclado ABNT2 USB', '', '', '7891234567896', 'Insumos', 'Disponível', 'consumable', 15, 3, '2024-03-01', 120.00, null]
+          ];
 
-        const insertAsset = db.prepare(`
-          INSERT OR REPLACE INTO assets (name, brand_model, serial_number, patrimony_tag, barcode, category, status, asset_type, stock_quantity, min_stock, purchase_date, purchase_value, warranty_expiry) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+          const insertAsset = db.prepare(`
+            INSERT OR REPLACE INTO assets (name, brand_model, serial_number, patrimony_tag, barcode, category, status, asset_type, stock_quantity, min_stock, purchase_date, purchase_value, warranty_expiry) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
 
-        sampleAssets.forEach(asset => {
-          insertAsset.run(asset);
-        });
+          sampleAssets.forEach(asset => {
+            insertAsset.run(asset);
+          });
 
-        insertAsset.finalize();
+          insertAsset.finalize();
+          console.log('✅ Ativos de exemplo inseridos:', sampleAssets.length);
+        }
 
         // Tabela de links externos para relatórios
         db.run(`

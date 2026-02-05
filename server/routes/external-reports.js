@@ -86,7 +86,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
         message: 'Link externo criado com sucesso',
         link_id: this.lastID,
         token,
-        url: `${frontendUrl}/public/report/${token}`
+        url: `${frontendUrl}/portal/${token}`
       });
     });
   } catch (error) {
@@ -391,7 +391,9 @@ router.get('/public/validate/:token', tokenValidationLimit, async (req, res) => 
     if (link.scope === 'general') {
       // Buscar todas as lojas
       db.all('SELECT id, name, city FROM stores ORDER BY name', (err, stores) => {
-        if (!err) {
+        if (err) {
+          console.error('Erro ao buscar lojas:', err);
+        } else {
           allowedStores = stores;
         }
         sendResponse();
@@ -401,7 +403,9 @@ router.get('/public/validate/:token', tokenValidationLimit, async (req, res) => 
       const storeIds = JSON.parse(link.store_ids);
       const placeholders = storeIds.map(() => '?').join(',');
       db.all(`SELECT id, name, city FROM stores WHERE id IN (${placeholders}) ORDER BY name`, storeIds, (err, stores) => {
-        if (!err) {
+        if (err) {
+          console.error('Erro ao buscar lojas específicas:', err);
+        } else {
           allowedStores = stores;
         }
         sendResponse();

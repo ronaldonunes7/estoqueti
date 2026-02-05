@@ -335,6 +335,8 @@ router.post('/transfer', authenticateToken, (req, res) => {
 
   db.serialize(() => {
     db.run('BEGIN TRANSACTION');
+    
+    let finalQuantity = quantity; // Definir finalQuantity no início
 
     // Verificar se o ativo existe e tem estoque suficiente
     db.get('SELECT * FROM assets WHERE id = ?', [asset_id], (err, asset) => {
@@ -428,7 +430,7 @@ router.post('/transfer', authenticateToken, (req, res) => {
             employee_name || 'Transferência', // Nome do colaborador ou padrão
             store.name, 
             store_id, 
-            finalQuantity,
+            finalQuantity, // Agora finalQuantity está definida
             responsible_technician, 
             observations || '', 
             req.user.id
@@ -892,38 +894,32 @@ router.post('/status-change', authenticateToken, (req, res) => {
     });
   }
 
-  db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+  // Registrar movimentação sem transação manual
+  const movementQuery = `
+    INSERT INTO movements (
+      asset_id, type, employee_name, destination, responsible_technician, 
+      observations, created_by, quantity
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
 
-    // Registrar movimentação
-    const movementQuery = `
-      INSERT INTO movements (
-        asset_id, type, employee_name, destination, responsible_technician, 
-        observations, created_by, quantity
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+  db.run(movementQuery, [
+    asset_id, 
+    type || 'Alteração de Status',
+    'Sistema', // employee_name
+    `Status alterado: ${old_status} → ${new_status}`, // destination
+    req.user.username, // responsible_technician
+    observations,
+    req.user.id,
+    1
+  ], function(err) {
+    if (err) {
+      console.error('Erro ao registrar movimentação:', err);
+      return res.status(500).json({ message: 'Erro ao registrar movimentação' });
+    }
 
-    db.run(movementQuery, [
-      asset_id, 
-      type || 'Alteração de Status',
-      'Sistema', // employee_name
-      `Status alterado: ${old_status} → ${new_status}`, // destination
-      req.user.username, // responsible_technician
-      observations,
-      req.user.id,
-      1
-    ], function(err) {
-      if (err) {
-        console.error('Erro ao registrar movimentação:', err);
-        db.run('ROLLBACK');
-        return res.status(500).json({ message: 'Erro ao registrar movimentação' });
-      }
-
-      db.run('COMMIT');
-      res.json({
-        message: 'Status alterado e movimentação registrada com sucesso',
-        movement_id: this.lastID
-      });
+    res.json({
+      message: 'Status alterado e movimentação registrada com sucesso',
+      movement_id: this.lastID
     });
   });
 });

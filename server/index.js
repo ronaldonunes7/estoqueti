@@ -12,6 +12,8 @@ const reportsRoutes = require('./routes/reports');
 const storesRoutes = require('./routes/stores');
 const externalReportsRoutes = require('./routes/external-reports');
 const responsibilityTermsRoutes = require('./routes/responsibility-terms');
+const devToolsRoutes = require('./routes/dev-tools');
+const cleanupRoutes = require('./routes/cleanup');
 
 const { initDatabase } = require('./database/init');
 
@@ -48,7 +50,25 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware de debug para capturar erros de JSON
+// Rotas da API
+app.use('/api/auth', authRoutes);
+app.use('/api/assets', assetsRoutes);
+app.use('/api/movements', movementsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/stores', storesRoutes);
+app.use('/api/external-reports', externalReportsRoutes);
+app.use('/api/responsibility-terms', responsibilityTermsRoutes);
+
+// Rotas de desenvolvimento (apenas em dev)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api/dev', devToolsRoutes);
+  app.use('/api/cleanup', cleanupRoutes);
+  console.log('🛠️ Rotas de desenvolvimento habilitadas');
+  console.log('🧹 Rotas de limpeza habilitadas');
+}
+
+// Middleware de debug para capturar erros de JSON (APÓS as rotas)
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('Erro de JSON parsing:');
@@ -60,16 +80,6 @@ app.use((err, req, res, next) => {
   }
   next();
 });
-
-// Rotas da API
-app.use('/api/auth', authRoutes);
-app.use('/api/assets', assetsRoutes);
-app.use('/api/movements', movementsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/stores', storesRoutes);
-app.use('/api/external-reports', externalReportsRoutes);
-app.use('/api/responsibility-terms', responsibilityTermsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

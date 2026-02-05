@@ -13,8 +13,11 @@ import { Reports } from './pages/Reports'
 import { AssetHistoryPage } from './pages/AssetHistory'
 import { PublicReport } from './pages/PublicReport'
 import { PublicPortal } from './pages/PublicPortal'
+import { DevTools } from './pages/DevTools'
 import { ExternalAccess } from './pages/ExternalAccess'
 import { UnitInventory } from './pages/UnitInventory'
+import { TestQR } from './pages/TestQR'
+import { DatabaseCleanup } from './pages/DatabaseCleanup'
 
 function App() {
   return (
@@ -23,7 +26,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         {/* Rotas públicas para visualização de relatórios */}
         <Route path="/view/report/:token" element={<PublicReport />} />
-        <Route path="/public/report/:token" element={<PublicPortal />} />
+        <Route path="/portal/:token" element={<PublicPortal />} />
         <Route
           path="/*"
           element={
@@ -35,12 +38,15 @@ function App() {
                   <Route path="/assets" element={<Assets />} />
                   <Route path="/stores" element={<Stores />} />
                   <Route path="/transfer" element={<Transfer />} />
-                  <Route path="/receipt-confirmation" element={<ReceiptConfirmation />} />
+                  <Route path="/confirmar-recebimento" element={<ReceiptConfirmation />} />
+                  <Route path="/test-qr" element={<TestQR />} />
+                  <Route path="/database-cleanup" element={<DatabaseCleanup />} />
                   <Route path="/movements" element={<Movements />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/external-access" element={<ExternalAccess />} />
                   <Route path="/inventory/asset/:id/history" element={<AssetHistoryPage />} />
                   <Route path="/inventory/unit/:id" element={<UnitInventory />} />
+                  <Route path="/dev-tools" element={<DevTools />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

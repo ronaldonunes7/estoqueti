@@ -143,11 +143,6 @@ export const PublicPortal: React.FC = () => {
       setRequiresPassword(false)
       setPasswordError('')
       
-      // Auto-select first store if only one is available
-      if (data.config.allowed_stores?.length === 1) {
-        setSelectedStoreId(data.config.allowed_stores[0].id)
-      }
-      
     } catch (error: any) {
       console.error('Erro na validação:', error)
       if (error.message.includes('Senha incorreta')) {
@@ -412,10 +407,10 @@ export const PublicPortal: React.FC = () => {
         </div>
 
         {/* Store Selector */}
-        {config.allowed_stores && config.allowed_stores.length > 1 && (
+        {config?.allowed_stores && config.allowed_stores.length >= 1 && (
           <div className="mb-8">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Selecionar Unidade
+              Selecionar Unidade ({config.allowed_stores.length} disponíveis)
             </label>
             <select
               value={selectedStoreId || ''}

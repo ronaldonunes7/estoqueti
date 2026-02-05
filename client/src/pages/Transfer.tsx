@@ -9,11 +9,13 @@ import {
   Store,
   AlertCircle,
   CheckCircle,
-  X
+  X,
+  QrCode
 } from 'lucide-react'
 import api from '../services/api'
 import { Asset, Store as StoreType, TransferFormData } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import { ShippingLabelGenerator } from '../components/ShippingLabelGenerator'
 import toast from 'react-hot-toast'
 
 export const Transfer: React.FC = () => {
@@ -24,6 +26,19 @@ export const Transfer: React.FC = () => {
   const [selectedStore, setSelectedStore] = useState<StoreType | null>(null)
   const [assetSearch, setAssetSearch] = useState('')
   const [storeSearch, setStoreSearch] = useState('')
+  
+  // Estados para etiqueta de envio
+  const [showShippingLabel, setShowShippingLabel] = useState(false)
+  const [lastTransferData, setLastTransferData] = useState<{
+    movementId: number
+    assetName: string
+    patrimonyTag?: string
+    serialNumber?: string
+    destinationStore: string
+    destinationCity: string
+    quantity: number
+    responsibleTechnician: string
+  } | null>(null)
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<TransferFormData>({
     defaultValues: {
@@ -92,10 +107,24 @@ export const Transfer: React.FC = () => {
   const transferMutation = useMutation(
     (data: TransferFormData) => api.post('/movements/transfer', data),
     {
-      onSuccess: () => {
+      onSuccess: (response, variables) => {
         queryClient.invalidateQueries('assets')
         queryClient.invalidateQueries('movements')
         queryClient.invalidateQueries('dashboard')
+        
+        // Capturar dados para etiqueta de envio
+        if (selectedAsset && selectedStore) {
+          setLastTransferData({
+            movementId: response.data.movement_id || Date.now(), // Fallback se não retornar ID
+            assetName: selectedAsset.name,
+            patrimonyTag: selectedAsset.patrimony_tag,
+            serialNumber: selectedAsset.serial_number,
+            destinationStore: selectedStore.name,
+            destinationCity: selectedStore.city,
+            quantity: variables.quantity,
+            responsibleTechnician: variables.responsible_technician
+          })
+        }
         
         // Reset form
         setSelectedAsset(null)
@@ -509,7 +538,51 @@ export const Transfer: React.FC = () => {
             {transferMutation.isLoading ? 'Processando...' : 'Confirmar Transferência'}
           </button>
         </div>
+        
+        {/* Botão de Etiqueta de Envio - Aparece após transferência bem-sucedida */}
+        {lastTransferData && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                <div>
+                  <h4 className="text-sm font-medium text-green-800">
+                    Transferência realizada com sucesso!
+                  </h4>
+                  <p className="text-sm text-green-700">
+                    {lastTransferData.assetName} → {lastTransferData.destinationStore}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShippingLabel(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
+                📄 Imprimir Etiqueta de Envio
+              </button>
+            </div>
+          </div>
+        )}
       </form>
+      
+      {/* Modal de Etiqueta de Envio */}
+      {showShippingLabel && lastTransferData && (
+        <ShippingLabelGenerator
+          movementId={lastTransferData.movementId}
+          assetName={lastTransferData.assetName}
+          patrimonyTag={lastTransferData.patrimonyTag}
+          serialNumber={lastTransferData.serialNumber}
+          destinationStore={lastTransferData.destinationStore}
+          destinationCity={lastTransferData.destinationCity}
+          quantity={lastTransferData.quantity}
+          responsibleTechnician={lastTransferData.responsibleTechnician}
+          onClose={() => {
+            setShowShippingLabel(false)
+            setLastTransferData(null) // Limpar dados após fechar
+          }}
+        />
+      )}
     </div>
   )
 }
