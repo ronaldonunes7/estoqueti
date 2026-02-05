@@ -180,9 +180,10 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
-        <div className="flex justify-between items-center mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header fixo */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Share2 className="h-6 w-6" />
             Compartilhar Relatório
@@ -195,28 +196,30 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Nome do Link */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nome do Relatório
-            </label>
-            <input
-              type="text"
-              {...register('name', { required: 'Nome é obrigatório' })}
-              placeholder="Ex: Relatório Mensal - Loja Centro"
-              className="input"
-            />
-            {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
-            )}
-          </div>
+        {/* Conteúdo com scroll */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" id="share-report-form">
+            {/* Nome do Link */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome do Relatório
+              </label>
+              <input
+                type="text"
+                {...register('name', { required: 'Nome é obrigatório' })}
+                placeholder="Ex: Relatório Mensal - Loja Centro"
+                className="input"
+              />
+              {errors.name && (
+                <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+              )}
+            </div>
 
-          {/* Escopo do Relatório */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Escopo do Relatório
-            </label>
+              {/* Escopo do Relatório */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Escopo do Relatório
+              </label>
             <div className="grid grid-cols-1 gap-4">
               <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                 <input
@@ -435,30 +438,32 @@ export const ShareReportModal: React.FC<ShareReportModalProps> = ({ onClose }) =
               Se definida, será necessário inserir a senha para acessar o relatório
             </p>
           </div>
+          </form>
+        </div>
 
-          {/* Botões */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={createLinkMutation.isLoading}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              {createLinkMutation.isLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <Share2 className="h-4 w-4" />
-              )}
-              Gerar Link
-            </button>
-          </div>
-        </form>
+        {/* Footer fixo com botões */}
+        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-secondary"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="share-report-form"
+            disabled={createLinkMutation.isLoading}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            {createLinkMutation.isLoading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Share2 className="h-4 w-4" />
+            )}
+            Gerar Link
+          </button>
+        </div>
       </div>
     </div>
   )
