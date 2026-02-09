@@ -289,26 +289,16 @@ router.get('/movements/pdf', authenticateToken, (req, res) => {
         doc.moveDown(0.5);
       });
 
-      // Rodapé
-      const pages = doc.bufferedPageRange();
-      for (let i = 0; i < pages.count; i++) {
-        doc.switchToPage(i);
-        doc.fontSize(8).text(
-          `Página ${i + 1} de ${pages.count}`,
-          50,
-          doc.page.height - 50,
-          { align: 'center' }
-        );
-      }
-
       doc.end();
       console.log('✅ Relatório PDF de movimentações gerado com sucesso');
     } catch (pdfError) {
       console.error('❌ Erro ao gerar PDF:', pdfError);
-      res.status(500).json({ 
-        message: 'Erro ao gerar PDF',
-        error: pdfError.message
-      });
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          message: 'Erro ao gerar PDF',
+          error: pdfError.message
+        });
+      }
     }
   });
 });
