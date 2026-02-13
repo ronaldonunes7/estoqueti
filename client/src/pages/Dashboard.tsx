@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useQuery } from 'react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { 
@@ -6,7 +6,6 @@ import {
   CheckCircle, 
   AlertTriangle, 
   Clock,
-  MapPin,
   Building,
   Eye,
   DollarSign,
@@ -15,9 +14,8 @@ import {
   AlertCircle,
   Info,
   Shield,
-  Users
+  Box
 } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import api from '../services/api'
 import { DashboardData } from '../types'
 import { format } from 'date-fns'
@@ -26,14 +24,22 @@ import { usePermissions } from '../hooks/usePermissions'
 import { AdminOnly, RoleGuard } from '../components/RoleGuard'
 import { LowStockAlert } from '../components/LowStockAlert'
 import { formatCurrency, formatCurrencyCompact } from '../utils/currency'
+import { StatCard } from '../components/dashboard/StatCard'
+import { MovementChart } from '../components/dashboard/MovementChart'
+import { StatusDonutChart } from '../components/dashboard/StatusDonutChart'
+import { StoreGrid } from '../components/dashboard/StoreGrid'
+import { TimeFilter, TimePeriod } from '../components/dashboard/TimeFilter'
+import { DashboardSkeleton } from '../components/dashboard/DashboardSkeleton'
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const permissions = usePermissions()
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('30d')
+
   const { data: dashboardData, isLoading } = useQuery<DashboardData>(
-    'dashboard',
+    ['dashboard', timePeriod],
     async () => {
-      const response = await api.get('/dashboard/metrics')
+      const response = await api.get(`/dashboard/metrics?period=${timePeriod}`)
       return response.data
     },
     {
@@ -82,28 +88,14 @@ export const Dashboard: React.FC = () => {
   )
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   const metrics = dashboardData?.metrics
   const chartData = dashboardData?.chartData || []
   const statusBreakdown = dashboardData?.breakdowns.status || []
 
-  // Cores semânticas do Tailwind
-  const SEMANTIC_COLORS = {
-    emerald: '#10b981', // Disponível/Positivo
-    blue: '#3b82f6',    // Em Uso/Em Trânsito
-    amber: '#f59e0b',   // Manutenção/Alerta
-    red: '#ef4444'      // Crítico/Descartado
-  }
-
-  const COLORS = [SEMANTIC_COLORS.emerald, SEMANTIC_COLORS.blue, SEMANTIC_COLORS.amber, SEMANTIC_COLORS.red]
-
-  // Cards de métricas com foco financeiro
+  // Cards de métricas com foco financeiro e indicadores de tendência
   const metricCards = [
     {
       title: 'Patrimônio Total',
@@ -113,44 +105,48 @@ export const Dashboard: React.FC = () => {
       bgColor: 'bg-emerald-50',
       iconColor: 'bg-emerald-500',
       textColor: 'text-emerald-700',
-      tooltip: 'Soma baseada no valor de compra dos ativos ativos'
+      tooltip: 'Soma baseada no valor de compra dos ativos ativos',
+      trend: metrics?.totalValueTrend ? {
+        value: metrics.totalValueTrend,
+        isPositive: metrics.totalValueTrend >= 0
+      } : undefined
     },
     {
-      title: 'Disponíveis',
-      value: `${metrics?.availableAssets || 0}`,
-      subtitle: formatCurrencyCompact(metrics?.availableValue || 0),
-      icon: CheckCircle,
-      bgColor: 'bg-emerald-50',
-      iconColor: 'bg-emerald-500',
-      textColor: 'text-emerald-600',
-      tooltip: 'Ativos prontos para uso'
+      title: 'Insumos Críticos',
+      value: `${metrics?.lowStockItems || 0}`,
+      subtitle: 'Abaixo do estoque mínimo',
+      icon: AlertTriangle,
+      bgColor: 'bg-red-50',
+      iconColor: 'bg-red-500',
+      textColor: 'text-red-600',
+      tooltip: 'Itens que precisam de reposição urgente'
     },
     {
-      title: 'Custo Imobilizado',
-      value: formatCurrency(metrics?.maintenanceValue || 0),
-      subtitle: `${metrics?.maintenanceAssets || 0} em manutenção`,
+      title: 'Itens em Manutenção',
+      value: `${metrics?.maintenanceAssets || 0}`,
+      subtitle: formatCurrencyCompact(metrics?.maintenanceValue || 0),
       icon: Wrench,
       bgColor: 'bg-amber-50',
       iconColor: 'bg-amber-500',
       textColor: 'text-amber-600',
-      tooltip: 'Valor dos ativos parados em conserto'
+      tooltip: 'Ativos indisponíveis por reparo'
     },
     {
-      title: 'Em Operação',
-      value: `${metrics?.inUseAssets || 0}`,
-      subtitle: formatCurrencyCompact(metrics?.inUseValue || 0),
-      icon: TrendingUp,
+      title: 'Distribuição',
+      value: `${((metrics?.uniqueAssets || 0) / (metrics?.totalAssets || 1) * 100).toFixed(0)}%`,
+      subtitle: `${metrics?.uniqueAssets || 0} únicos / ${metrics?.supplyAssets || 0} insumos`,
+      icon: Box,
       bgColor: 'bg-blue-50',
       iconColor: 'bg-blue-500',
       textColor: 'text-blue-600',
-      tooltip: 'Ativos atualmente em uso'
+      tooltip: 'Proporção entre ativos únicos e insumos'
     },
   ]
 
   return (
     <div className="space-y-6">
-      {/* Header diferenciado por role */}
-      <div className="flex items-center justify-between">
+      {/* Header diferenciado por role com filtro temporal */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
             Dashboard
@@ -175,15 +171,8 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Indicador de permissões */}
-        <div className="text-right">
-          <div className="text-sm text-gray-500">
-            Logado como: <span className="font-medium">{permissions.user?.username}</span>
-          </div>
-          <div className="text-xs text-gray-400">
-            {permissions.isAdmin ? "Controle total do sistema" : "Acesso de visualização"}
-          </div>
-        </div>
+        {/* Filtro Temporal Global */}
+        <TimeFilter selected={timePeriod} onChange={setTimePeriod} />
       </div>
 
       {/* Dashboard para Administradores - Controle Completo */}
@@ -282,31 +271,9 @@ export const Dashboard: React.FC = () => {
       }>
         {/* Dashboard Completo para Administradores */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {metricCards.map((card) => {
-            const Icon = card.icon
-            return (
-              <div key={card.title} className={`card ${card.bgColor} border-0`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                      <div className="group relative">
-                        <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                          {card.tooltip}
-                        </div>
-                      </div>
-                    </div>
-                    <p className={`text-2xl font-bold ${card.textColor}`}>{card.value}</p>
-                    <p className="text-sm text-gray-500 mt-1">{card.subtitle}</p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${card.iconColor}`}>
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+          {metricCards.map((card) => (
+            <StatCard key={card.title} {...card} />
+          ))}
         </div>
       </AdminOnly>
 
@@ -326,53 +293,12 @@ export const Dashboard: React.FC = () => {
             </Link>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {storesData.slice(0, 6).map((store: any) => {
-              const storeValue = storesValue?.find((sv: any) => sv.id === store.id)
-              return (
-                <div
-                  key={store.id}
-                  onClick={() => navigate(`/inventory/unit/${store.id}`)}
-                  className="card hover:shadow-lg transition-all duration-200 cursor-pointer border-2 border-transparent hover:border-blue-200 group bg-white"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                        {store.name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
-                        <MapPin className="w-3 h-3" />
-                        <span>{store.city}</span>
-                      </div>
-                      {store.responsible && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Responsável: {store.responsible}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                    </div>
-                  </div>
-                  
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Patrimônio Alocado:</span>
-                      <span className="font-semibold text-emerald-600">
-                        {formatCurrency(storeValue?.total_value || 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
-                      <span>{storeValue?.asset_count || 0} ativos</span>
-                      <span className="text-blue-600 font-medium group-hover:text-blue-700">
-                        Ver inventário →
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <StoreGrid 
+            stores={storesData}
+            storesValue={storesValue || []}
+            isLoading={!storesData}
+            onTransferClick={(storeId) => navigate(`/transfer?destination=${storeId}`)}
+          />
         </div>
       )}
 
@@ -408,73 +334,11 @@ export const Dashboard: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de movimentações com cores semânticas */}
-        <div className="card">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Movimentações dos Últimos 30 Dias
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="date" 
-                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: ptBR })}
-              />
-              <YAxis />
-              <Tooltip 
-                labelFormatter={(value) => format(new Date(value), 'dd/MM/yyyy', { locale: ptBR })}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="saidas" 
-                stroke={SEMANTIC_COLORS.blue}
-                strokeWidth={2}
-                name="Saídas"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="entradas" 
-                stroke={SEMANTIC_COLORS.emerald}
-                strokeWidth={2}
-                name="Entradas"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {/* Gráfico de movimentações com área */}
+        <MovementChart data={chartData} isLoading={isLoading} />
 
-        {/* Gráfico de status com cores semânticas */}
-        <div className="card">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Distribuição por Status
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={statusBreakdown}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ status, count }) => `${status}: ${count}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="count"
-              >
-                {statusBreakdown.map((entry, index) => {
-                  let color = SEMANTIC_COLORS.emerald // Default: Disponível
-                  if (entry.status === 'Em Uso' || entry.status === 'Em Trânsito') {
-                    color = SEMANTIC_COLORS.blue
-                  } else if (entry.status === 'Manutenção') {
-                    color = SEMANTIC_COLORS.amber
-                  } else if (entry.status === 'Descartado') {
-                    color = SEMANTIC_COLORS.red
-                  }
-                  return <Cell key={`cell-${index}`} fill={color} />
-                })}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        {/* Gráfico de status com donut */}
+        <StatusDonutChart data={statusBreakdown} isLoading={isLoading} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -484,23 +348,39 @@ export const Dashboard: React.FC = () => {
             Movimentações Recentes
           </h3>
           <div className="space-y-3">
-            {recentMovements?.map((movement: any) => (
-              <div key={movement.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">{movement.asset_name}</p>
-                  <p className="text-sm text-gray-600">
-                    {movement.type} - {movement.employee_name}
-                  </p>
+            {recentMovements && recentMovements.length > 0 ? (
+              recentMovements.map((movement: any) => (
+                <div key={movement.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div>
+                    <p className="font-medium text-gray-900">{movement.asset_name}</p>
+                    <p className="text-sm text-gray-600">
+                      {movement.type} - {movement.employee_name}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(movement.movement_date), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">
-                    {format(new Date(movement.movement_date), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                  </p>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Nenhuma movimentação recente
+                </h3>
+                <p className="text-gray-500 mb-4">
+                  Comece registrando entradas e saídas de ativos
+                </p>
+                <Link
+                  to="/movements"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Package className="w-4 h-4" />
+                  Registrar Movimentação
+                </Link>
               </div>
-            ))}
-            {(!recentMovements || recentMovements.length === 0) && (
-              <p className="text-gray-500 text-center py-4">Nenhuma movimentação recente</p>
             )}
           </div>
         </div>
